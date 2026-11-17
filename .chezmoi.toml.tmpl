@@ -1,0 +1,16 @@
+# Chezmoi configuration for this machine.
+#
+# This file is rendered once by `chezmoi init`. Edit the template in the
+# dotfiles repo, not ~/.config/chezmoi/chezmoi.toml.
+
+[data]
+    # Prompted on first init only; defaults make a non-interactive init work.
+    name = {{ promptStringOnce . "name" "Your full name" "Your Name" | quote }}
+    email = {{ promptStringOnce . "email" "Email address for Git commits" "you@example.com" | quote }}
+    editor = "nvim"
+
+    # Detected once at init and available to templates as isWSL, isMacOS and
+    # isWindows.
+    isWSL = {{ contains "microsoft" .chezmoi.kernel.osrelease }}
+    isMacOS = {{ eq .chezmoi.os "darwin" }}
+    isWindows = {{ eq .chezmoi.os "windows" }}

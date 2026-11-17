@@ -1,0 +1,53 @@
+{{ if eq .chezmoi.os "windows" -}}
+# Install applications on Windows 11 with winget.
+# Rendered empty on other operating systems, so chezmoi skips it there.
+$ErrorActionPreference = 'Continue'
+
+if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    Write-Warning 'winget was not found; install App Installer from the Microsoft Store and re-run chezmoi apply.'
+    exit 0
+}
+
+# Keep this list in sync with the apt/Homebrew lists in the .sh script.
+$packages = @(
+    'Microsoft.PowerShell'
+    'Git.Git'
+    'Microsoft.WindowsTerminal'
+    'Starship.Starship'
+    'BurntSushi.ripgrep.MSVC'
+    'sharkdp.fd'
+    'sharkdp.bat'
+    'eza-community.eza'
+    'junegunn.fzf'
+    'ajeetdsouza.zoxide'
+    'jqlang.jq'
+    'Neovim.Neovim'
+    'GitHub.cli'
+    'astral-sh.uv'
+    'Zellij.Zellij'
+    'JesseDuffield.lazygit'
+)
+
+$failed = @()
+foreach ($id in $packages) {
+    winget list --id $id --exact --accept-source-agreements *> $null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "already installed: $id"
+        continue
+    }
+
+    Write-Host "installing: $id"
+    winget install --id $id --exact --source winget `
+        --accept-package-agreements --accept-source-agreements `
+        --silent --disable-interactivity
+    if ($LASTEXITCODE -ne 0) {
+        $failed += $id
+    }
+}
+
+if ($failed.Count -gt 0) {
+    Write-Warning "Some winget packages failed: $($failed -join ', ')"
+}
+
+Write-Host 'Windows packages complete. Open a new terminal to pick up PATH changes.'
+{{ end -}}

@@ -1,0 +1,68 @@
+# Starship prompt: works on Ubuntu Server, WSL2, macOS and Windows.
+# Deliberately uses plain ASCII symbols so it renders on any terminal.
+
+add_newline = false
+command_timeout = 1000
+
+format = """
+$hostname\
+$directory\
+$git_branch\
+$git_status\
+$python\
+$nodejs\
+$rust\
+$golang\
+$cmd_duration\
+$line_break\
+$character"""
+
+[character]
+success_symbol = "[>](bold green)"
+error_symbol = "[>](bold red)"
+vimcmd_symbol = "[<](bold green)"
+
+[hostname]
+ssh_only = true
+format = "[$hostname](bold red) "
+
+[directory]
+truncation_length = 3
+truncate_to_repo = false
+style = "bold cyan"
+
+[git_branch]
+symbol = "git:"
+style = "bold purple"
+
+[git_status]
+style = "bold red"
+conflicted = "!"
+ahead = ">"
+behind = "<"
+diverged = "<>"
+untracked = "?"
+modified = "!"
+staged = "+"
+renamed = "r"
+deleted = "x"
+
+[cmd_duration]
+min_time = 2000
+format = "took [$duration](bold yellow) "
+
+[python]
+format = "[$virtualenv]($style) "
+style = "bold yellow"
+
+[nodejs]
+format = "[$version]($style) "
+style = "bold green"
+
+[rust]
+format = "[$version]($style) "
+style = "bold red"
+
+[golang]
+format = "[$version]($style) "
+style = "bold cyan"

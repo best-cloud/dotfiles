@@ -1,0 +1,43 @@
+# Global Git ignores, applied on every machine through core.excludesFile.
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Editors and IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Shells and tools
+.direnv/
+.envrc.local
+.history
+
+# Environments and secrets
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+
+# Languages and build output
+__pycache__/
+*.py[cod]
+node_modules/
+dist/
+build/
+target/
+*.log
+
+# Local AI/agent scratch files
+.crush/
+.opencode/

@@ -1,0 +1,129 @@
+# Managed by chezmoi. Edit dot_config/fish/config.fish.tmpl in the dotfiles
+# repo instead of editing this file directly.
+
+# ---------------------------------------------------------------------------
+# PATH
+# ---------------------------------------------------------------------------
+fish_add_path --global --move ~/.local/bin
+fish_add_path --global --move ~/.cargo/bin
+# opencode installs its launcher here.
+fish_add_path --global ~/.opencode/bin
+
+{{ if eq .chezmoi.os "darwin" -}}
+# Homebrew: /opt/homebrew on Apple Silicon, /usr/local on Intel.
+if test -x /opt/homebrew/bin/brew
+    eval (/opt/homebrew/bin/brew shellenv)
+else if test -x /usr/local/bin/brew
+    eval (/usr/local/bin/brew shellenv)
+end
+{{ end -}}
+
+# ---------------------------------------------------------------------------
+# Debian/Ubuntu package names differ from the upstream binary names.
+# Defining these wrappers here keeps a single config file for all systems.
+# ---------------------------------------------------------------------------
+if type -q fdfind; and not type -q fd
+    function fd --description 'fd (Debian/Ubuntu package name)'
+        fdfind $argv
+    end
+end
+
+if type -q batcat; and not type -q bat
+    function bat --description 'bat (Debian/Ubuntu package name)'
+        batcat $argv
+    end
+end
+
+# ---------------------------------------------------------------------------
+# Environment
+# ---------------------------------------------------------------------------
+set -gx EDITOR {{ .editor }}
+set -gx VISUAL {{ .editor }}
+set -gx PAGER less
+set -gx LESS -R
+
+# Use the real binary name here: MANPAGER runs under sh, where fish functions
+# (such as the Debian `bat` wrapper above) are not available.
+if type -q batcat
+    set -gx MANPAGER "sh -c 'col -bx | batcat -l man -p'"
+else if type -q bat
+    set -gx MANPAGER "sh -c 'col -bx | bat -l man -p'"
+end
+
+{{ if .isWSL -}}
+# Open URLs with the Windows browser when wslu is installed.
+if type -q wslview
+    set -gx BROWSER wslview
+end
+{{ end -}}
+
+# ---------------------------------------------------------------------------
+# Interactive shell
+# ---------------------------------------------------------------------------
+if status is-interactive
+    set -g fish_greeting
+
+    # Prompt
+    if type -q starship
+        starship init fish | source
+    end
+
+    # Smarter cd: `z <query>` and interactive `zi`.
+    if type -q zoxide
+        zoxide init fish | source
+    end
+
+    # Fuzzy history and file search. fzf >= 0.48 can emit fish bindings
+    # directly; Ubuntu 24.04 ships an older fzf with a bindings file instead.
+    if type -q fzf
+        if fzf --fish >/dev/null 2>&1
+            fzf --fish | source
+        else if test -f /usr/share/doc/fzf/examples/key-bindings.fish
+            source /usr/share/doc/fzf/examples/key-bindings.fish
+        end
+        set -gx FZF_DEFAULT_OPTS '--height 40% --layout=reverse --border --info=inline'
+        # FZF_DEFAULT_COMMAND runs under $SHELL, so use the actual binary name.
+        if type -q fdfind
+            set -gx FZF_DEFAULT_COMMAND 'fdfind --type f --hidden --exclude .git'
+        else if type -q fd
+            set -gx FZF_DEFAULT_COMMAND 'fd --type f --hidden --exclude .git'
+        end
+    end
+
+    # Prefer the modern replacements when they are installed.
+    if type -q eza
+        abbr --add --global ls eza
+        abbr --add --global ll 'eza -lah'
+        abbr --add --global lt 'eza --tree'
+    end
+    if type -q bat
+        abbr --add --global cat bat
+    end
+
+    if type -q git
+        abbr --add --global g git
+        abbr --add --global gs 'git status -sb'
+        abbr --add --global gl 'git log --oneline --graph --decorate --all'
+        abbr --add --global gd 'git diff'
+        abbr --add --global gco 'git checkout'
+    end
+    if type -q lazygit
+        abbr --add --global lg lazygit
+    end
+    if type -q nvim
+        abbr --add --global v nvim
+    end
+    if type -q zellij
+        abbr --add --global zj zellij
+        abbr --add --global za 'zellij attach -c'
+        abbr --add --global zls 'zellij list-sessions'
+    end
+    if type -q opencode
+        abbr --add --global o opencode
+    end
+end
+
+# Optional machine-specific settings that stay out of the repo.
+if test -f ~/.config/fish/local.fish
+    source ~/.config/fish/local.fish
+end

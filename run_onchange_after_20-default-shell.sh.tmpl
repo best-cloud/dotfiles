@@ -1,0 +1,43 @@
+{{ if ne .chezmoi.os "windows" -}}
+#!/bin/sh
+# Make fish the login shell on Ubuntu and macOS.
+# Idempotent, and rendered empty on Windows.
+set -eu
+
+fish_path=$(command -v fish 2>/dev/null || true)
+if [ -z "$fish_path" ]; then
+    echo "fish is not installed yet; leaving the login shell unchanged" >&2
+    exit 0
+fi
+
+if [ "$(uname -s)" = "Darwin" ]; then
+    current_shell=$(dscl . -read "/Users/$(id -un)" UserShell 2>/dev/null | awk '{print $2}')
+else
+    current_shell=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)
+fi
+
+if [ "$current_shell" = "$fish_path" ]; then
+    exit 0
+fi
+
+SUDO=""
+if [ "$(id -u)" -ne 0 ]; then
+    if command -v sudo >/dev/null 2>&1; then
+        SUDO=sudo
+    else
+        echo "warning: sudo is required to change the login shell; skipping" >&2
+        exit 0
+    fi
+fi
+
+# chsh refuses shells that are not listed in /etc/shells.
+if ! grep -Fqx "$fish_path" /etc/shells 2>/dev/null; then
+    echo "$fish_path" | $SUDO tee -a /etc/shells >/dev/null
+fi
+
+echo "==> setting the login shell to $fish_path"
+# shellcheck disable=SC2086  # $SUDO is intentionally empty when running as root
+$SUDO chsh -s "$fish_path" "$(id -un)"
+
+echo "==> fish is now the login shell; log out and back in (or run: exec fish)"
+{{ end -}}

@@ -1,0 +1,182 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/sh
+# Install packages on Ubuntu Server / WSL2 with apt.
+#
+# This file is a `run_onchange_` script: chezmoi re-runs it only when the
+# rendered contents change, so adding a package below is all that is needed.
+set -eu
+
+SUDO=""
+if [ "$(id -u)" -ne 0 ]; then
+    if command -v sudo >/dev/null 2>&1; then
+        SUDO=sudo
+        sudo -v
+    else
+        echo "error: root or sudo is required to install packages" >&2
+        exit 1
+    fi
+fi
+
+has() { command -v "$1" >/dev/null 2>&1; }
+
+# Tools packaged by every supported Ubuntu release. Optional tools are checked
+# with apt-cache below and installed by their upstream installer if missing.
+PACKAGES="
+ca-certificates
+curl
+wget
+git
+build-essential
+unzip
+zip
+fish
+ripgrep
+fd-find
+bat
+fzf
+zoxide
+eza
+jq
+tree
+htop
+btop
+tmux
+neovim
+direnv
+gh
+starship
+lazygit
+zellij
+uv
+"
+
+echo "==> apt-get update"
+$SUDO env DEBIAN_FRONTEND=noninteractive apt-get update -y
+
+available=""
+unavailable=""
+for pkg in $PACKAGES; do
+    if dpkg -s "$pkg" >/dev/null 2>&1; then
+        continue
+    fi
+    if apt-cache show "$pkg" >/dev/null 2>&1; then
+        available="$available $pkg"
+    else
+        unavailable="$unavailable $pkg"
+    fi
+done
+
+if [ -n "$available" ]; then
+    echo "==> apt-get install:$available"
+    # shellcheck disable=SC2086  # word splitting of the package list is intended
+    $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $available
+fi
+
+# Fall back to the upstream installer only for tools that this Ubuntu release
+# does not package. Downloads are best-effort so a transient network error does
+# not block the rest of the dotfiles from being applied.
+for pkg in $unavailable; do
+    case "$pkg" in
+    starship)
+        has starship && continue
+        echo "==> installing starship (not packaged by this Ubuntu release)"
+        curl -fsSL https://starship.rs/install.sh | sh -s -- -y ||
+            echo "warning: starship installation failed" >&2
+        ;;
+    zellij)
+        has zellij && continue
+        case "$(uname -m)" in
+        x86_64 | amd64) zellij_arch=x86_64 ;;
+        aarch64 | arm64) zellij_arch=aarch64 ;;
+        *)
+            echo "warning: no zellij build for $(uname -m)" >&2
+            continue
+            ;;
+        esac
+        echo "==> installing zellij (not packaged by this Ubuntu release)"
+        tmpdir=$(mktemp -d)
+        if curl -fsSL "https://github.com/zellij-org/zellij/releases/latest/download/zellij-${zellij_arch}-unknown-linux-musl.tar.gz" -o "$tmpdir/zellij.tar.gz"; then
+            tar -xzf "$tmpdir/zellij.tar.gz" -C "$tmpdir"
+            mkdir -p "$HOME/.local/bin"
+            install -m 755 "$tmpdir/zellij" "$HOME/.local/bin/zellij"
+        else
+            echo "warning: zellij download failed" >&2
+        fi
+        rm -rf "$tmpdir"
+        ;;
+    uv)
+        has uv && continue
+        echo "==> installing uv (not packaged by this Ubuntu release)"
+        curl -LsSf https://astral.sh/uv/install.sh | sh ||
+            echo "warning: uv installation failed" >&2
+        ;;
+    *)
+        echo "warning: $pkg is not available from apt; install it manually" >&2
+        ;;
+    esac
+done
+
+echo "==> Linux packages complete"
+{{ else if eq .chezmoi.os "darwin" -}}
+#!/bin/sh
+# Install packages on macOS with Homebrew.
+set -eu
+
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+if ! command -v brew >/dev/null 2>&1; then
+    echo "==> installing Homebrew"
+    # Interactive on purpose: on a fresh Mac this lets the Homebrew installer
+    # offer to install the Xcode Command Line Tools as well.
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    if [ -x /opt/homebrew/bin/brew ]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [ -x /usr/local/bin/brew ]; then
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
+fi
+
+if ! command -v brew >/dev/null 2>&1; then
+    echo "warning: Homebrew is unavailable; skipping package installation" >&2
+    exit 0
+fi
+
+BREW_PACKAGES="
+git
+fish
+starship
+ripgrep
+fd
+bat
+eza
+fzf
+zoxide
+jq
+tree
+htop
+btop
+tmux
+zellij
+neovim
+direnv
+gh
+lazygit
+uv
+wget
+"
+
+missing=""
+for pkg in $BREW_PACKAGES; do
+    if ! brew list --formula "$pkg" >/dev/null 2>&1; then
+        missing="$missing $pkg"
+    fi
+done
+
+if [ -n "$missing" ]; then
+    echo "==> brew install:$missing"
+    # shellcheck disable=SC2086  # word splitting of the package list is intended
+    brew install $missing
+fi
+
+echo "==> macOS packages complete"
+{{ end -}}

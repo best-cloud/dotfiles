@@ -1,0 +1,52 @@
+# Managed by chezmoi. Edit dot_gitconfig.tmpl in the dotfiles repo.
+
+[user]
+    name = {{ .name }}
+    email = {{ .email }}
+
+[init]
+    defaultBranch = main
+
+[core]
+    editor = {{ .editor }}
+    pager = less -FRX
+    excludesFile = ~/.gitignore_global
+
+[color]
+    ui = auto
+
+[pull]
+    rebase = true
+
+[push]
+    autoSetupRemote = true
+
+[fetch]
+    prune = true
+
+[rebase]
+    autosquash = true
+
+[merge]
+    conflictstyle = zdiff3
+
+[alias]
+    st = status -sb
+    co = checkout
+    br = branch
+    ci = commit
+    lg = log --oneline --graph --decorate --all
+    last = log -1 HEAD
+    unstage = reset HEAD --
+    amend = commit --amend --no-edit
+
+{{ if eq .chezmoi.os "linux" -}}
+[credential]
+    helper = cache --timeout=3600
+{{ else if eq .chezmoi.os "darwin" -}}
+[credential]
+    helper = osxkeychain
+{{ else if eq .chezmoi.os "windows" -}}
+[credential]
+    helper = manager
+{{ end -}}
