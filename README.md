@@ -50,6 +50,10 @@ official installer on Linux (apt does not package it). On first run you are
 prompted once for your name and email (used by Git); those answers are stored
 in `~/.config/chezmoi/chezmoi.toml`.
 
+The generated config also records `sourceDir`. Without that, a bootstrap from a
+local checkout would leave later `chezmoi apply`/`chezmoi status` calls looking
+in the default source (`~/.local/share/chezmoi`), which does not exist.
+
 `bootstrap.sh` asks for your sudo password once up front so the apt phase does
 not stop halfway through.
 
@@ -73,6 +77,7 @@ GitHub (SSH key or `gh auth login`), or pass an SSH URL through
 | Editors / multiplexers | neovim, zellij | neovim, zellij | Neovim, Zellij |
 | Dev tools | gh, direnv, uv, lazygit | gh, direnv, uv, lazygit | gh, uv, lazygit |
 | Terminal | — | — | Windows Terminal |
+| Terminal font | — (client terminal) | JetBrainsMono Nerd Font | JetBrainsMono Nerd Font |
 
 Ubuntu releases do not all package `starship`, `zellij` and `uv`. The script
 checks apt first and only then falls back to the official installer (or the
@@ -84,15 +89,15 @@ continues, and the shell config still works without them.
 
 ```text
 .
-├── .chezmoi.toml.tmpl                  # machine data + prompts (name, email, isWSL)
+├── .chezmoi.toml.tmpl                  # machine data + prompts (sourceDir, name, email, isWSL)
 ├── .chezmoiignore                      # OS-specific targets
 ├── bootstrap.sh / bootstrap.ps1        # one-command entry points
 ├── dot_gitconfig.tmpl                  # single Git config for all OSes
 ├── dot_gitignore_global
 ├── dot_config/
 │   ├── fish/config.fish.tmpl           # single fish config for Ubuntu + macOS
-│   ├── starship.toml                   # shared by all OSes
-│   ├── zellij/config.kdl               # Unix
+│   ├── starship.toml                   # catppuccin-powerline preset, all OSes
+│   ├── zellij/config.kdl               # shared; Windows uses ZELLIJ_CONFIG_DIR
 │   └── nvim/init.lua                   # plugin-free, works offline
 ├── Documents/
 │   ├── PowerShell/
@@ -115,10 +120,13 @@ The scripts are templates too. On the wrong OS a script renders to whitespace,
 and chezmoi skips whitespace-only scripts entirely. That is why a `.ps1`
 script is safe in the same repo as Linux/macOS `.sh` scripts.
 
-To force every `run_onchange_` script to run again:
+To force every `run_onchange_` script to run again, delete its entry from
+chezmoi's state. Script hashes are stored in `entryState` (the old
+`--bucket=scriptState` is no longer used by current chezmoi):
 
 ```sh
-chezmoi state delete-bucket --bucket=scriptState
+chezmoi state dump   # script entries have "type": "script"
+chezmoi state delete --bucket=entryState --key="$HOME/10-install-packages.sh"
 chezmoi apply
 ```
 
@@ -158,8 +166,22 @@ genuinely differ.
 `/etc/shells` when needed and runs `chsh`. Log out and back in (or run
 `exec fish`) when it finishes.
 
-The Starship prompt uses plain ASCII symbols, so it is readable on a server TTY
-and over SSH without a Nerd Font.
+The Starship config is the `catppuccin-powerline` preset, so the prompt uses
+Nerd Font glyphs and powerline separators. Install `JetBrainsMono Nerd Font`
+on the machine that renders the terminal (Windows and macOS runtimes do this
+automatically) and select it in the terminal profile. If you only have a bare
+TTY or a terminal without a Nerd Font, regenerate the file with a fallback
+preset instead:
+
+```sh
+starship preset no-nerd-font -o dot_config/starship.toml
+```
+
+To pick up preset changes after a Starship upgrade:
+
+```sh
+starship preset catppuccin-powerline -o dot_config/starship.toml
+```
 
 ## Windows notes
 
@@ -174,10 +196,14 @@ and over SSH without a Nerd Font.
   OneDrive, edit both paths in the repo (or ignore them and keep local copies).
 - The profile sets `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME` and
   `XDG_CACHE_HOME` to Unix-style locations under your home directory. This lets
-  Neovim and Starship use the same managed config files as Linux/macOS instead
-  of duplicating them in `%LOCALAPPDATA%`.
+  Neovim, Starship and Zellij use the same managed config files as
+  Linux/macOS instead of duplicating them in `%LOCALAPPDATA%`. Zellij ignores
+  `XDG_CONFIG_HOME` on Windows, so the profile also sets `ZELLIJ_CONFIG_DIR`.
 - PowerShell 7 is installed first by the winget script. The script itself is
   compatible with Windows PowerShell 5.1 in case chezmoi starts under it.
+- The Nerd Font ships as a machine-scope MSI, so install it from an elevated
+  window. Afterwards select `JetBrainsMono NF` as the font face in Windows
+  Terminal (Settings → Profiles → Defaults → Appearance).
 - WSL2 needs no extra Windows-side config. Run `bootstrap.sh` inside the WSL
   distro as well; the two sides are independent chezmoi installations.
 
@@ -251,5 +277,5 @@ chezmoi verify
 - **Homebrew is missing on a fresh Mac** — the macOS script installs it
   automatically; you may be prompted to install the Xcode Command Line Tools.
 - **Nothing re-runs after editing a script** — only rendered content changes
-  trigger `run_onchange_`. Use the `state delete-bucket` command above to force
-  a run.
+  trigger `run_onchange_`. Delete the script's `entryState` key as shown above
+  to force a run.

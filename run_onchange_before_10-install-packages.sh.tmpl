@@ -178,5 +178,25 @@ if [ -n "$missing" ]; then
     brew install $missing
 fi
 
+# The Starship prompt uses Nerd Font glyphs. The font must be installed on the
+# machine that renders the terminal, so it is a macOS cask (Linux/WSL render in
+# the client terminal instead).
+BREW_CASKS="
+font-jetbrains-mono-nerd-font
+"
+
+missing_casks=""
+for cask in $BREW_CASKS; do
+    if ! brew list --cask "$cask" >/dev/null 2>&1; then
+        missing_casks="$missing_casks $cask"
+    fi
+done
+
+if [ -n "$missing_casks" ]; then
+    echo "==> brew install --cask:$missing_casks"
+    # shellcheck disable=SC2086  # word splitting of the cask list is intended
+    brew install --cask $missing_casks
+fi
+
 echo "==> macOS packages complete"
 {{ end -}}

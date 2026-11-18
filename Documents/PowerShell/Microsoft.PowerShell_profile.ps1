@@ -22,6 +22,10 @@ $env:XDG_CACHE_HOME = Join-Path $HOME '.cache'
 $env:EDITOR = 'nvim'
 $env:VISUAL = 'nvim'
 
+# Zellij ignores XDG_CONFIG_HOME on Windows, so point it at the shared
+# ~/.config/zellij/config.kdl managed by chezmoi.
+$env:ZELLIJ_CONFIG_DIR = Join-Path $HOME '.config\zellij'
+
 # ---------------------------------------------------------------------------
 # Prompt
 # ---------------------------------------------------------------------------

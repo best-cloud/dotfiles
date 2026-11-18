@@ -1,5 +1,6 @@
 # Files that live in the repo but should not be copied into the home directory.
 README.md
+AGENTS.md
 bootstrap.sh
 bootstrap.ps1
 LICENSE
@@ -11,9 +12,9 @@ LICENSE
 Documents/**
 {{ end -}}
 
-# Unix-only targets. Neovim is kept because the Windows profile sets
-# XDG_CONFIG_HOME, so Neovim reads ~/.config/nvim on Windows as well.
+# Unix-only targets. Neovim and Zellij are kept because the Windows profile
+# sets XDG_CONFIG_HOME (and ZELLIJ_CONFIG_DIR), so they read ~/.config on
+# Windows as well.
 {{ if eq .chezmoi.os "windows" -}}
 .config/fish/**
-.config/zellij/**
 {{ end -}}

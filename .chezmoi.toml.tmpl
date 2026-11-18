@@ -3,6 +3,11 @@
 # This file is rendered once by `chezmoi init`. Edit the template in the
 # dotfiles repo, not ~/.config/chezmoi/chezmoi.toml.
 
+# Pin the source directory. Without this, a local-checkout bootstrap leaves
+# chezmoi pointing at the default source (~/.local/share/chezmoi), so later
+# `chezmoi apply`/`status` calls fail.
+sourceDir = {{ .chezmoi.sourceDir | quote }}
+
 [data]
     # Prompted on first init only; defaults make a non-interactive init work.
     name = {{ promptStringOnce . "name" "Your full name" "Your Name" | quote }}
@@ -10,7 +15,8 @@
     editor = "nvim"
 
     # Detected once at init and available to templates as isWSL, isMacOS and
-    # isWindows.
-    isWSL = {{ contains "microsoft" .chezmoi.kernel.osrelease }}
+    # isWindows. .chezmoi.kernel is empty on Windows and macOS, so only read
+    # osrelease on Linux.
+    isWSL = {{ if eq .chezmoi.os "linux" }}{{ contains "microsoft" .chezmoi.kernel.osrelease }}{{ else }}false{{ end }}
     isMacOS = {{ eq .chezmoi.os "darwin" }}
     isWindows = {{ eq .chezmoi.os "windows" }}

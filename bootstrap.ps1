@@ -49,5 +49,9 @@ if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot '.chezmoi.toml.tmpl')
     chezmoi init --apply $Repo
 }
 
+if ($LASTEXITCODE -ne 0) {
+    throw "chezmoi init --apply failed with exit code $LASTEXITCODE"
+}
+
 Write-Host ''
 Write-Host '==> done. Open a new Windows Terminal tab to use the new profile.'
