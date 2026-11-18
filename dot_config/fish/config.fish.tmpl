@@ -73,6 +73,11 @@ if status is-interactive
         zoxide init fish | source
     end
 
+    # Load .envrc files automatically.
+    if type -q direnv
+        direnv hook fish | source
+    end
+
     # Fuzzy history and file search. fzf >= 0.48 can emit fish bindings
     # directly; Ubuntu 24.04 ships an older fzf with a bindings file instead.
     if type -q fzf

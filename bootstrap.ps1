@@ -24,6 +24,24 @@ if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
     throw 'winget is required. Install "App Installer" from the Microsoft Store and re-run.'
 }
 
+# `chezmoi init <repo>` clones with git, and the dotfiles install script runs
+# only after the clone. A fresh Windows 11 has no Git, so install it first.
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    Write-Host '==> installing Git'
+    winget install --id Git.Git --exact --source winget `
+        --accept-package-agreements --accept-source-agreements `
+        --silent --disable-interactivity
+    Update-SessionPath
+    $gitCmd = Join-Path $env:ProgramFiles 'Git\cmd'
+    if (Test-Path $gitCmd) {
+        $env:Path = "$gitCmd;$env:Path"
+    }
+}
+
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    throw 'git installation failed. Install Git for Windows and re-run.'
+}
+
 if (-not (Get-Command chezmoi -ErrorAction SilentlyContinue)) {
     Write-Host '==> installing chezmoi'
     winget install --id twpayne.chezmoi --exact --source winget `

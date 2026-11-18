@@ -10,7 +10,11 @@ local opt = vim.opt
 opt.number = true
 opt.relativenumber = true
 opt.mouse = "a"
-opt.clipboard = "unnamedplus"
+-- Only use the system clipboard when a provider (wl-copy, xclip, pbcopy, …)
+-- exists. Headless servers have none, and yanks would fail without this guard.
+if vim.fn.has("clipboard") == 1 then
+  opt.clipboard = "unnamedplus"
+end
 opt.termguicolors = true
 opt.expandtab = true
 opt.shiftwidth = 2

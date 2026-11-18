@@ -40,6 +40,38 @@ fi
 PATH="$HOME/.local/bin:$PATH"
 export PATH
 
+# `chezmoi init <repo>` clones with git, and the one-line bootstrap needs an
+# HTTP client before anything is installed. Fresh Ubuntu Server and WSL images
+# do not always ship git, so install the bootstrap prerequisites first.
+if ! command -v git >/dev/null 2>&1 ||
+    { ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; }; then
+    if command -v apt-get >/dev/null 2>&1; then
+        echo "==> installing bootstrap prerequisites (git, curl)"
+        SUDO=""
+        if [ "$(id -u)" -ne 0 ]; then
+            if command -v sudo >/dev/null 2>&1; then
+                SUDO=sudo
+            else
+                echo "error: sudo is required to install git" >&2
+                exit 1
+            fi
+        fi
+        $SUDO env DEBIAN_FRONTEND=noninteractive apt-get update -y
+        $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates curl
+    fi
+fi
+
+if ! command -v git >/dev/null 2>&1 && [ "$LOCAL" -eq 0 ]; then
+    if [ "$(uname -s)" = "Darwin" ]; then
+        echo "error: git is required. Install the Xcode Command Line Tools with" >&2
+        echo "       'xcode-select --install' and re-run this script." >&2
+    else
+        echo "error: git is required to clone $REPO; install git and re-run." >&2
+    fi
+    exit 1
+fi
+
 if ! command -v chezmoi >/dev/null 2>&1; then
     echo "==> installing chezmoi"
     if [ "$(uname -s)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then

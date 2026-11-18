@@ -46,7 +46,9 @@ powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1
 
 Both bootstraps install chezmoi if needed, then run `chezmoi init --apply`.
 chezmoi itself comes from Homebrew or winget where available, and from its
-official installer on Linux (apt does not package it). On first run you are
+official installer on Linux (apt does not package it). Both bootstraps install
+Git first when it is missing (plus `curl` on minimal Linux images), because the
+first `chezmoi init` clones this repository with git. On first run you are
 prompted once for your name and email (used by Git); those answers are stored
 in `~/.config/chezmoi/chezmoi.toml`.
 
@@ -84,6 +86,12 @@ checks apt first and only then falls back to the official installer (or the
 GitHub release binary for zellij). `eza` and `lazygit` are installed from apt
 when the release provides them; otherwise the script prints a warning and
 continues, and the shell config still works without them.
+
+Ubuntu 26.04 packages Starship 1.22.1, but the shipped
+`catppuccin-powerline` preset uses `jj_bookmark`, added in Starship 1.27.0.
+The script therefore installs the upstream Starship release into
+`~/.local/bin` when the packaged version is older. That directory comes first
+in `PATH`, so the newer binary shadows `/usr/bin/starship`.
 
 ## Repository layout
 
@@ -158,7 +166,7 @@ genuinely differ.
 - adds `~/.local/bin` and `~/.cargo/bin` to `PATH`;
 - loads Homebrew's `shellenv` on macOS only;
 - defines `fd`/`bat` wrappers for Ubuntu's `fdfind`/`batcat` names;
-- initializes Starship, zoxide and fzf;
+- initializes Starship, zoxide, fzf and direnv;
 - adds guarded abbreviations (`ls` → `eza`, `cat` → `bat`, `zj` → zellij, …);
 - sources `~/.config/fish/local.fish` if it exists for machine-local tweaks.
 
@@ -279,3 +287,7 @@ chezmoi verify
 - **Nothing re-runs after editing a script** — only rendered content changes
   trigger `run_onchange_`. Delete the script's `entryState` key as shown above
   to force a run.
+- **Starship reports `Unknown key: jj_bookmark`** — the managed preset requires
+  Starship >= 1.27.0. The install script upgrades Ubuntu's packaged 1.22.1 into
+  `~/.local/bin`; if the warning persists, check that `command -v starship`
+  resolves to `~/.local/bin/starship` and re-run `chezmoi apply`.
