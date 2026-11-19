@@ -79,12 +79,15 @@ if (Get-Module -ListAvailable PSReadLine) {
 # Aliases and abbreviations, kept in sync with dot_config/fish/config.fish.tmpl.
 # ---------------------------------------------------------------------------
 if (Get-Command eza -ErrorAction SilentlyContinue) {
-    Set-Alias -Name ls -Value eza -Force
+    # `ls` is an AllScope built-in alias; -Force would strip that option and
+    # error, so keep it explicitly.
+    Set-Alias -Name ls -Value eza -Option AllScope -Force
     function ll { eza -lah @args }
     function lt { eza --tree @args }
 }
 if (Get-Command bat -ErrorAction SilentlyContinue) {
-    Set-Alias -Name cat -Value bat -Force
+    # `cat` is AllScope for the same reason as `ls` above.
+    Set-Alias -Name cat -Value bat -Option AllScope -Force
 }
 if (Get-Command git -ErrorAction SilentlyContinue) {
     Set-Alias -Name g -Value git -Force
@@ -102,9 +105,7 @@ if (Get-Command lazygit -ErrorAction SilentlyContinue) {
 if (Get-Command nvim -ErrorAction SilentlyContinue) {
     Set-Alias -Name vi -Value nvim -Force
 }
-if (Get-Command emacs -ErrorAction SilentlyContinue) {
-    function e { emacs -nw @args }
-}
+# No `e` -> `emacs -nw` here: on Windows Emacs is used through its GUI only.
 if (Get-Command zellij -ErrorAction SilentlyContinue) {
     Set-Alias -Name zj -Value zellij -Force
     function za { zellij attach -c @args }

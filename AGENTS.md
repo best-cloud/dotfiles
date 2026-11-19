@@ -76,7 +76,8 @@ agents otherwise get wrong.
 - Shell abbreviations are defined twice: fish in
   `dot_config/fish/config.fish.tmpl` and PowerShell in the PS7 profile. Keep
   the two lists in sync; use functions in PowerShell where the alias needs
-  arguments (`e`, `ll`, `za`, …).
+  arguments (`ll`, `za`, …). The one deliberate exception is `e` → `emacs -nw`:
+  it exists only in fish because Windows runs Emacs as a GUI.
 - `.chezmoi.kernel` is empty on Windows, so `.chezmoi.kernel.osrelease` must
   stay behind `eq .chezmoi.os "linux"` (this previously crashed `chezmoi init`
   on Windows).

@@ -251,8 +251,9 @@ genuinely differ.
 - sources `~/.config/fish/local.fish` if it exists for machine-local tweaks.
 
 The PowerShell 7 profile defines the same aliases and abbreviations, so both
-shells behave the same way on Windows; the 5.1 shim inherits them by
-dot-sourcing that profile.
+shells behave the same way on Windows, except for `e` → `emacs -nw`: Windows
+uses the Emacs GUI only, so the profile has no `e`. The 5.1 shim inherits
+everything else by dot-sourcing that profile.
 
 `run_onchange_after_20-default-shell.sh.tmpl` adds the fish path to
 `/etc/shells` when needed and runs `chsh`. Log out and back in (or run
