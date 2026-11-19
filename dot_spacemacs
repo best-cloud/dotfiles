@@ -573,12 +573,14 @@ This function is called immediately after `dotspacemacs/init', before layer
 configuration.
 It is mostly for variables that should be set before packages are loaded.
 If you are unsure, try setting them in `dotspacemacs/user-config' first."
-  ;; Raw develop-branch snippet from
-  ;; https://mirrors.tuna.tsinghua.edu.cn/help/elpa/
+  ;; TUNA develop-branch snippet from
+  ;; https://mirrors.tuna.tsinghua.edu.cn/help/elpa/ with NonGNU ELPA added:
+  ;; Spacemacs' lock file uses it and the org layer needs `org-contrib' from it.
   (setq configuration-layer-elpa-archives
-    '(("melpa-cn" . "https://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
-      ("org-cn"   . "https://mirrors.tuna.tsinghua.edu.cn/elpa/org/")
-      ("gnu-cn"   . "https://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")))
+    '(("melpa-cn"  . "https://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
+      ("org-cn"    . "https://mirrors.tuna.tsinghua.edu.cn/elpa/org/")
+      ("gnu-cn"    . "https://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")
+      ("nongnu-cn" . "https://mirrors.tuna.tsinghua.edu.cn/elpa/nongnu/")))
   )
 
 (defun dotspacemacs/user-config ()

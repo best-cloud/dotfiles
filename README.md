@@ -83,6 +83,7 @@ GitHub (SSH key or `gh auth login`), or pass an SSH URL through
 | Modern CLI | ripgrep, fd-find, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq |
 | Editors / multiplexers | neovim, emacs, zellij | neovim, emacs, zellij | Neovim, Emacs, Zellij |
 | Dev tools | gh, direnv, uv, lazygit | gh, direnv, uv, lazygit | gh, uv, lazygit |
+| Containers | podman | podman | — |
 | Node.js | fnm + Node.js LTS (no apt) | fnm + Node.js LTS (no Homebrew) | Node.js LTS (winget) |
 | AI / Python tooling | opencode, ruff | opencode, ruff | OpenCode, Ruff |
 | Formatters | prettier, shfmt | prettier, shfmt | Prettier, shfmt |
@@ -98,6 +99,10 @@ falls back to the official installer (the GitHub release binary for zellij,
 `eza` and `lazygit` are installed from apt when the release provides them;
 otherwise the script prints a warning and continues, and the shell config still
 works without them.
+
+Podman is installed on Ubuntu and macOS but not on Windows. On macOS it is only
+the client; run `podman machine init` once before the first container so it can
+start its Linux VM.
 
 OpenCode is not packaged by apt, so the Linux script uses the upstream
 installer and puts the launcher in `~/.opencode/bin`, which fish already adds to
@@ -366,10 +371,12 @@ from winget). `run_onchange_after_30-spacemacs.*` clones the Spacemacs
 never switched or overwritten because Spacemacs updates itself (`SPC f e U`).
 
 `dot_spacemacs` is the upstream develop `.spacemacs` template plus the TUNA
-ELPA snippet copied verbatim from the develop section of
+ELPA snippet from the develop section of
 <https://mirrors.tuna.tsinghua.edu.cn/help/elpa/>. It sets
 `configuration-layer-elpa-archives` to the `melpa-cn`, `org-cn` and `gnu-cn`
-mirrors. The GUI default font is JetBrainsMono NF at 12 pt medium weight, and
+mirrors, plus `nongnu-cn` because Spacemacs' lock file also uses NonGNU ELPA
+and the org layer needs `org-contrib` from it. The GUI default
+font is JetBrainsMono NF at 12 pt medium weight, and
 the mode-line theme uses `:separator-scale 1.1` to match the managed WezTerm
 profile. The first Emacs start downloads Spacemacs packages through the mirror,
 so it needs network access once. Edit the repo copy rather than `~/.spacemacs`;

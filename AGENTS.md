@@ -50,7 +50,8 @@ agents otherwise get wrong.
 - The same tool must stay in sync across three lists: apt (linux branch of
   `...install-packages.sh.tmpl`), Homebrew formulas/casks (darwin branch), and
   winget IDs (`...install-packages.ps1.tmpl`). Tools apt may not package need a
-  `case` fallback in the linux branch.
+  `case` fallback in the linux branch. Podman is the deliberate exception: it
+  is installed on Ubuntu and macOS only, not on Windows.
 - Node.js is the deliberate exception: it is never installed by apt or Homebrew.
   The Linux branch installs fnm with its upstream installer
   (`--skip-shell --install-dir ~/.local/share/fnm`) and the macOS branch installs
@@ -91,10 +92,13 @@ agents otherwise get wrong.
   branch only when `~/.emacs.d` is absent; never switch or overwrite an
   existing checkout.
 - `dot_spacemacs` is the upstream develop template plus the TUNA ELPA snippet
-  copied verbatim from the develop section of the TUNA ELPA help page in
+  from the develop section of the TUNA ELPA help page in
   `dotspacemacs/user-init()`. On develop the override variable is
   `configuration-layer-elpa-archives` (single dash), not the master-only
-  double-dash name. Do not rewrite the published snippet. The default GUI font
+  double-dash name. Keep the published snippet format, but it omits NonGNU
+  ELPA, which Spacemacs' lock file uses for `org-contrib`, so `nongnu-cn` is
+  added as a fourth archive; removing it brings back "Package org-contrib is
+  not available". The default GUI font
   is JetBrainsMono NF 12 pt medium; the mode-line height uses
   `:separator-scale 1.1`.
 - The deb822 TUNA apt-mirror logic exists twice: in `bootstrap.sh` (so the
