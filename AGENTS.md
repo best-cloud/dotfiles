@@ -51,6 +51,21 @@ agents otherwise get wrong.
   `...install-packages.sh.tmpl`), Homebrew formulas/casks (darwin branch), and
   winget IDs (`...install-packages.ps1.tmpl`). Tools apt may not package need a
   `case` fallback in the linux branch.
+- OpenCode is not packaged by apt: Linux uses its upstream installer into
+  `~/.opencode/bin` (already on the script's and fish's `PATH`), macOS uses the
+  `anomalyco/tap/opencode-v2` Homebrew tap outside `BREW_PACKAGES`, and Windows
+  uses `Anomaly.OpenCode`. Ruff is in all three lists (apt falls back to
+  `uv tool install ruff`).
+- Prettier is installed through npm on Linux and Windows (Node.js is in all
+  three lists) and through Homebrew on macOS. shfmt is in all three lists.
+  Spacemacs enables format-on-save per layer; HTML/CSS, YAML and Markdown use
+  prettier hooks in `dotspacemacs/user-config`. Windows points
+  `prettier-js-diff-command` at Git's bundled GNU diff, and macOS uses `gdiff`
+  from Homebrew `diffutils`.
+- Shell abbreviations are defined twice: fish in
+  `dot_config/fish/config.fish.tmpl` and PowerShell in the PS7 profile. Keep
+  the two lists in sync; use functions in PowerShell where the alias needs
+  arguments (`e`, `ll`, `za`, …).
 - `.chezmoi.kernel` is empty on Windows, so `.chezmoi.kernel.osrelease` must
   stay behind `eq .chezmoi.os "linux"` (this previously crashed `chezmoi init`
   on Windows).

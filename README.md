@@ -83,16 +83,31 @@ GitHub (SSH key or `gh auth login`), or pass an SSH URL through
 | Modern CLI | ripgrep, fd-find, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq |
 | Editors / multiplexers | neovim, emacs, zellij | neovim, emacs, zellij | Neovim, Emacs, Zellij |
 | Dev tools | gh, direnv, uv, lazygit | gh, direnv, uv, lazygit | gh, uv, lazygit |
+| AI / Python tooling | opencode, ruff | opencode, ruff | OpenCode, Ruff |
+| Formatters | prettier, shfmt | prettier, shfmt | Prettier, shfmt |
 | Terminal | — (client terminal) | Ghostty | Windows Terminal, WezTerm |
 | WSL2 / Ubuntu | — (native) | — | Microsoft.WSL + latest Ubuntu LTS |
 | Terminal font | — (client terminal) | JetBrainsMono Nerd Font | JetBrainsMono Nerd Font |
 | Editor config | Spacemacs in `~/.emacs.d` | Spacemacs in `~/.emacs.d` | Spacemacs in `%USERPROFILE%\.emacs.d` |
 
-Ubuntu releases do not all package `starship`, `zellij` and `uv`. The script
-checks apt first and only then falls back to the official installer (or the
-GitHub release binary for zellij). `eza` and `lazygit` are installed from apt
-when the release provides them; otherwise the script prints a warning and
-continues, and the shell config still works without them.
+Ubuntu releases do not all package `starship`, `zellij`, `uv` and `ruff`. The
+script checks apt first and only then falls back to the official installer (the
+GitHub release binary for zellij, or `uv tool install` for ruff). `eza` and
+`lazygit` are installed from apt when the release provides them; otherwise the
+script prints a warning and continues, and the shell config still works without
+them.
+
+OpenCode is not packaged by apt, so the Linux script uses the upstream
+installer and puts the launcher in `~/.opencode/bin`, which fish already adds to
+`PATH`. macOS installs it from the upstream Homebrew tap
+(`anomalyco/tap/opencode-v2`), and Windows installs the official portable
+`Anomaly.OpenCode` winget package.
+
+Prettier is not packaged by apt either. The Linux script installs Node.js and
+npm from apt and runs `npm install -g --prefix "$HOME/.local" prettier`;
+macOS uses the `prettier` Homebrew formula (which pulls in Node), and Windows
+installs Node.js LTS with winget and then runs `npm install -g prettier`.
+`shfmt` comes from apt, Homebrew and winget.
 
 Ubuntu 26.04 packages Starship 1.22.1, but the shipped
 `catppuccin-powerline` preset uses `jj_bookmark`, added in Starship 1.27.0.
@@ -208,8 +223,13 @@ genuinely differ.
 - loads Homebrew's `shellenv` on macOS only;
 - defines `fd`/`bat` wrappers for Ubuntu's `fdfind`/`batcat` names;
 - initializes Starship, zoxide, fzf and direnv;
-- adds guarded abbreviations (`ls` → `eza`, `cat` → `bat`, `zj` → zellij, …);
+- adds guarded abbreviations (`ls` → `eza`, `cat` → `bat`, `vi` → `nvim`,
+  `e` → `emacs -nw`, `zj` → zellij, `o` → opencode, …);
 - sources `~/.config/fish/local.fish` if it exists for machine-local tweaks.
+
+The PowerShell 7 profile defines the same aliases and abbreviations, so both
+shells behave the same way on Windows; the 5.1 shim inherits them by
+dot-sourcing that profile.
 
 `run_onchange_after_20-default-shell.sh.tmpl` adds the fish path to
 `/etc/shells` when needed and runs `chsh`. Log out and back in (or run
@@ -331,6 +351,29 @@ profile. The first Emacs start downloads Spacemacs packages through the mirror,
 so it needs network access once. Edit the repo copy rather than `~/.spacemacs`;
 values Emacs appends at the end of the file are reverted by the next
 `chezmoi apply`.
+
+The enabled layers cover editing and navigation (`auto-completion`,
+`better-defaults`, `git`, `helm`, `multiple-cursors`, `syntax-checking`,
+`treemacs`, `version-control`) and the common languages `python`, `javascript`,
+`typescript`, `html` (which also handles CSS/SCSS/Less), `yaml`, `json`,
+`markdown`, `org` and `shell-scripts`. Formatting is enabled on save:
+
+- `syntax-checking` runs Flycheck, which prefers its built-in `python-ruff`
+  checker when `ruff` is on `PATH` (Flycheck 39+).
+- The Python layer is configured with `python-formatter 'ruff` and
+  `python-format-on-save t`. Spacemacs uses the `ruff-format` package for both
+  the on-save hook and `SPC m =` on the current buffer.
+- JavaScript, TypeScript, HTML/CSS, JSON, YAML and Markdown use prettier. The
+  JS/TS/JSON layers provide their own `*-fmt-on-save` variables; the HTML/CSS,
+  YAML and Markdown hooks live in `dotspacemacs/user-config`.
+- Shell scripts use shfmt through the `shell-scripts-format-on-save` layer
+  variable.
+- On Windows, prettier-js is pointed at Git's bundled GNU `diff`, because
+  `diff.exe` is not otherwise on `PATH`. On macOS it uses `gdiff` from the
+  `diffutils` formula because the system `diff` is the BSD variant.
+  `dotspacemacs/user-config` also adds `~/.local/bin`, the Homebrew
+  directories on macOS, and the WinGet/npm directories on Windows to
+  `exec-path` so GUI Emacs finds prettier, ruff, shfmt and opencode.
 
 On Windows the script also sets the user-scope `HOME` variable to
 `%USERPROFILE%` when no `HOME` is defined. Emacs otherwise uses

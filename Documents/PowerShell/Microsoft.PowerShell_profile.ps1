@@ -9,6 +9,12 @@ if ($env:Path -notlike "*$localBin*") {
     $env:Path = "$localBin;$env:Path"
 }
 
+# winget installs portable CLI shims here (for example OpenCode).
+$wingetLinks = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'
+if ((Test-Path $wingetLinks) -and ($env:Path -notlike "*$wingetLinks*")) {
+    $env:Path = "$wingetLinks;$env:Path"
+}
+
 # ---------------------------------------------------------------------------
 # Environment
 # ---------------------------------------------------------------------------
@@ -70,24 +76,40 @@ if (Get-Module -ListAvailable PSReadLine) {
 }
 
 # ---------------------------------------------------------------------------
-# Prefer the modern replacements when they are installed.
+# Aliases and abbreviations, kept in sync with dot_config/fish/config.fish.tmpl.
 # ---------------------------------------------------------------------------
 if (Get-Command eza -ErrorAction SilentlyContinue) {
-    Remove-Item Alias:ls -ErrorAction SilentlyContinue
-    Set-Alias -Name ls -Value eza
+    Set-Alias -Name ls -Value eza -Force
+    function ll { eza -lah @args }
+    function lt { eza --tree @args }
 }
 if (Get-Command bat -ErrorAction SilentlyContinue) {
-    Remove-Item Alias:cat -ErrorAction SilentlyContinue
-    Set-Alias -Name cat -Value bat
+    Set-Alias -Name cat -Value bat -Force
+}
+if (Get-Command git -ErrorAction SilentlyContinue) {
+    Set-Alias -Name g -Value git -Force
+    # `gl` is a read-only built-in alias for Get-Location; it would shadow the
+    # function, so force-remove it first.
+    Remove-Item Alias:gl -Force -ErrorAction SilentlyContinue
+    function gs { git status -sb @args }
+    function gl { git log --oneline --graph --decorate --all @args }
+    function gd { git diff @args }
+    function gco { git checkout @args }
 }
 if (Get-Command lazygit -ErrorAction SilentlyContinue) {
-    Set-Alias -Name lg -Value lazygit
+    Set-Alias -Name lg -Value lazygit -Force
 }
 if (Get-Command nvim -ErrorAction SilentlyContinue) {
-    Set-Alias -Name v -Value nvim
+    Set-Alias -Name vi -Value nvim -Force
 }
-
-# Git abbreviations.
-function gs { git status -sb @args }
-function gl { git log --oneline --graph --decorate --all @args }
-function gd { git diff @args }
+if (Get-Command emacs -ErrorAction SilentlyContinue) {
+    function e { emacs -nw @args }
+}
+if (Get-Command zellij -ErrorAction SilentlyContinue) {
+    Set-Alias -Name zj -Value zellij -Force
+    function za { zellij attach -c @args }
+    function zls { zellij list-sessions @args }
+}
+if (Get-Command opencode -ErrorAction SilentlyContinue) {
+    Set-Alias -Name o -Value opencode -Force
+}

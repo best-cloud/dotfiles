@@ -116,7 +116,10 @@ if status is-interactive
         abbr --add --global lg lazygit
     end
     if type -q nvim
-        abbr --add --global v nvim
+        abbr --add --global vi nvim
+    end
+    if type -q emacs
+        abbr --add --global e 'emacs -nw'
     end
     if type -q zellij
         abbr --add --global zj zellij

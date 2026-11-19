@@ -33,27 +33,32 @@ This function should only modify configuration layer settings."
    ;; List of configuration layers to load.
    dotspacemacs-configuration-layers
    '(
-     ;; ----------------------------------------------------------------
-     ;; Example of useful layers you may want to use right away.
-     ;; Uncomment some layer names and press `SPC f e R' (Vim style) or
-     ;; `M-m f e R' (Emacs style) to install them.
-     ;; ----------------------------------------------------------------
-     ;; auto-completion
-     ;; better-defaults
+     ;; Core editing, completion and navigation.
+     auto-completion
+     better-defaults
      emacs-lisp
-     ;; git
+     git
      helm
-     ;; lsp
-     ;; markdown
      multiple-cursors
-     ;; org
-     ;; (shell :variables
-     ;;        shell-default-height 30
-     ;;        shell-default-position 'bottom)
-     ;; spell-checking
-     ;; syntax-checking
-     ;; version-control
-     treemacs)
+     syntax-checking
+     treemacs
+     version-control
+
+     ;; Languages. Prettier formats the web/config formats on save, ruff
+     ;; formats Python and shfmt formats shell scripts.
+     (html :variables web-fmt-tool 'prettier)
+     (javascript :variables javascript-fmt-tool 'prettier
+                 javascript-fmt-on-save t)
+     (json :variables json-fmt-tool 'prettier
+           json-fmt-on-save t)
+     markdown
+     org
+     (python :variables python-formatter 'ruff
+             python-format-on-save t)
+     (shell-scripts :variables shell-scripts-format-on-save t)
+     (typescript :variables typescript-fmt-tool 'prettier
+                 typescript-fmt-on-save t)
+     yaml)
 
 
    ;; List of additional packages that will be installed without being wrapped
@@ -584,6 +589,75 @@ This function is called at the very end of Spacemacs startup, after layer
 configuration.
 Put your configuration code here, except for variables that should be set
 before packages are loaded."
+  ;; Ruff is installed on every platform by the package scripts. The
+  ;; syntax-checking layer (Flycheck 39+) prefers its built-in `python-ruff'
+  ;; checker over flake8/pylint when `ruff' is on PATH.
+  ;;
+  ;; Formatting is configured on the python layer itself: it selects the
+  ;; `ruff-format' package, formats on save (`python-format-on-save') and binds
+  ;; `SPC m =' to format the current buffer.
+  ;;
+  ;; GUI Emacs does not always inherit the shell PATH, so add the directories
+  ;; used by the user-local, Homebrew and Windows package-manager installs.
+  (add-to-list 'exec-path (expand-file-name "~/.local/bin"))
+  (when (eq system-type 'darwin)
+    (dolist (dir '("/opt/homebrew/bin" "/usr/local/bin"))
+      (add-to-list 'exec-path dir)))
+  (when (eq system-type 'windows-nt)
+    (dolist (dir (list (expand-file-name "~/AppData/Local/Microsoft/WinGet/Links")
+                       (expand-file-name "~/AppData/Roaming/npm")))
+      (when (file-directory-p dir)
+        (add-to-list 'exec-path dir))))
+
+  ;; Prettier formats HTML/CSS, YAML and Markdown on save. The JavaScript,
+  ;; TypeScript and JSON layers enable their own prettier hooks; these layers
+  ;; have no format-on-save switch.
+  (defun dotspacemacs//prettier-on-save (parser)
+    "Format the current buffer with prettier using PARSER on save."
+    (setq-local prettier-js-args (list (concat "--parser=" parser)))
+    (prettier-js-mode 1))
+
+  (add-hook 'web-mode-hook
+            (lambda ()
+              ;; Only format content types that prettier understands; leave
+              ;; template types such as PHP/ERB unchanged.
+              (let ((parser (pcase web-mode-content-type
+                              ("css" "css")
+                              ("scss" "scss")
+                              ("less" "less")
+                              ("json" "json")
+                              ("javascript" "babel")
+                              ((or "html" "") "html")
+                              (_ nil))))
+                (when parser
+                  (dotspacemacs//prettier-on-save parser)))))
+  (add-hook 'css-mode-hook
+            (lambda () (dotspacemacs//prettier-on-save "css")))
+  (add-hook 'scss-mode-hook
+            (lambda () (dotspacemacs//prettier-on-save "scss")))
+  (add-hook 'less-css-mode-hook
+            (lambda () (dotspacemacs//prettier-on-save "less")))
+  (dolist (hook '(yaml-mode-hook yaml-ts-mode-hook))
+    (add-hook hook
+              (lambda () (dotspacemacs//prettier-on-save "yaml"))))
+  (add-hook 'markdown-mode-hook
+            (lambda () (dotspacemacs//prettier-on-save "markdown")))
+
+  ;; prettier-js applies changes through `diff'. Windows has no diff.exe on
+  ;; PATH, but Git for Windows ships GNU diff. macOS ships BSD diff, so use the
+  ;; GNU diff from Homebrew's diffutils.
+  (with-eval-after-load 'prettier-js
+    (pcase system-type
+      ('windows-nt
+       (let ((git-diff (cl-find-if
+                        #'file-exists-p
+                        '("C:/Program Files/Git/usr/bin/diff.exe"
+                          "C:/Program Files (x86)/Git/usr/bin/diff.exe"))))
+         (when git-diff
+           (setq prettier-js-diff-command git-diff))))
+      ('darwin
+       (when (executable-find "gdiff")
+         (setq prettier-js-diff-command "gdiff")))))
   )
 
 

@@ -27,8 +27,12 @@ $packages = @(
     'GNU.Emacs'
     'GitHub.cli'
     'astral-sh.uv'
+    'astral-sh.ruff'
     'Zellij.Zellij'
     'JesseDuffield.lazygit'
+    'Anomaly.OpenCode'
+    'OpenJS.NodeJS.LTS'
+    'mvdan.shfmt'
     'DEVCOM.JetBrainsMonoNerdFont'
 )
 
@@ -51,6 +55,33 @@ foreach ($id in $packages) {
 
 if ($failed.Count -gt 0) {
     Write-Warning "Some winget packages failed: $($failed -join ', ')"
+}
+
+# Prettier (through npm) formats JS/TS/HTML/CSS/JSON/YAML/Markdown in Emacs.
+# Node's MSI updates the persistent PATH, but this process may not see it yet,
+# so prefer the known npm.cmd locations before falling back to Get-Command.
+$prettierCmd = Join-Path $env:APPDATA 'npm\prettier.cmd'
+if (-not (Test-Path $prettierCmd)) {
+    $npmCmd = @(
+        (Join-Path $env:ProgramFiles 'nodejs\npm.cmd')
+        (Join-Path $env:LOCALAPPDATA 'Programs\nodejs\npm.cmd')
+        (Get-Command npm.cmd -ErrorAction SilentlyContinue).Source
+    ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+
+    if (-not $npmCmd) {
+        $npm = Get-Command npm -ErrorAction SilentlyContinue
+        if ($npm) { $npmCmd = $npm.Source }
+    }
+
+    if ($npmCmd) {
+        Write-Host 'installing: prettier (npm)'
+        & $npmCmd install -g prettier
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning 'prettier installation failed'
+        }
+    } else {
+        Write-Warning 'npm was not found; prettier was not installed'
+    }
 }
 
 Write-Host 'Windows packages complete. Open a new terminal to pick up PATH changes.'
