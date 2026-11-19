@@ -51,17 +51,28 @@ agents otherwise get wrong.
   `...install-packages.sh.tmpl`), Homebrew formulas/casks (darwin branch), and
   winget IDs (`...install-packages.ps1.tmpl`). Tools apt may not package need a
   `case` fallback in the linux branch.
+- Node.js is the deliberate exception: it is never installed by apt or Homebrew.
+  The Linux branch installs fnm with its upstream installer
+  (`--skip-shell --install-dir ~/.local/share/fnm`) and the macOS branch installs
+  the `fnm` formula; both then run `fnm install --lts` and
+  `fnm default lts-latest`. Do not add `nodejs`/`npm` back to PACKAGES, `node`
+  to BREW_PACKAGES, or the `prettier` formula (it depends on Homebrew Node.js).
+  Windows keeps `OpenJS.NodeJS.LTS` from winget. fish sources
+  `fnm env --use-on-cd`. Spacemacs does not use Node.js, so nothing in
+  `dot_spacemacs` should grow a `node` dependency.
 - OpenCode is not packaged by apt: Linux uses its upstream installer into
   `~/.opencode/bin` (already on the script's and fish's `PATH`), macOS uses the
   `anomalyco/tap/opencode-v2` Homebrew tap outside `BREW_PACKAGES`, and Windows
   uses `Anomaly.OpenCode`. Ruff is in all three lists (apt falls back to
   `uv tool install ruff`).
-- Prettier is installed through npm on Linux and Windows (Node.js is in all
-  three lists) and through Homebrew on macOS. shfmt is in all three lists.
-  Spacemacs enables format-on-save per layer; HTML/CSS, YAML and Markdown use
-  prettier hooks in `dotspacemacs/user-config`. Windows points
-  `prettier-js-diff-command` at Git's bundled GNU diff, and macOS uses `gdiff`
-  from Homebrew `diffutils`.
+- Prettier is installed through npm on Linux, macOS and Windows (on Unix it
+  runs after fnm has put Node.js on `PATH`, into `~/.local`). shfmt is in all
+  three lists. Spacemacs uses neither: only the python layer formats on save
+  (`python-formatter 'ruff`, `python-format-on-save t`). Do not re-add a
+  prettier-js hook, the web/config `*-fmt-on-save` variables or
+  `shell-scripts-format-on-save`; the other language layers are editing,
+  completion and Flycheck only. `diffutils` stays in the Homebrew list for
+  `gdiff`, but prettier-js no longer configures `prettier-js-diff-command`.
 - Shell abbreviations are defined twice: fish in
   `dot_config/fish/config.fish.tmpl` and PowerShell in the PS7 profile. Keep
   the two lists in sync; use functions in PowerShell where the alias needs

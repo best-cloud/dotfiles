@@ -17,10 +17,11 @@ if [ "$(id -u)" -ne 0 ]; then
     fi
 fi
 
-# Upstream installers place binaries here. OpenCode uses ~/.opencode/bin and
-# installs its launcher there. Include both so re-running this script sees
-# those installs instead of downloading them again.
-PATH="$HOME/.opencode/bin:$HOME/.local/bin:$PATH"
+# Upstream installers place binaries here. OpenCode uses ~/.opencode/bin, and
+# fnm installs its own binary next to the Node.js versions it manages. Include
+# all of them so re-running this script sees those installs instead of
+# downloading them again.
+PATH="$HOME/.local/share/fnm:$HOME/.opencode/bin:$HOME/.local/bin:$PATH"
 export PATH
 mkdir -p "$HOME/.local/bin"
 
@@ -63,8 +64,7 @@ zellij
 uv
 ruff
 opencode
-nodejs
-npm
+fnm
 prettier
 shfmt
 "
@@ -78,7 +78,10 @@ for pkg in $PACKAGES; do
     if dpkg -s "$pkg" >/dev/null 2>&1; then
         continue
     fi
-    if apt-cache show "$pkg" >/dev/null 2>&1; then
+    # `apt-cache show` also succeeds for a name that is only referenced by
+    # another package's dependencies (on Ubuntu 26.04, `ruff` is a dependency
+    # of helix) even though there is nothing to install. Require a candidate.
+    if apt-cache policy "$pkg" 2>/dev/null | grep -q 'Candidate: [^(]'; then
         available="$available $pkg"
     else
         unavailable="$unavailable $pkg"
@@ -164,6 +167,38 @@ for pkg in $unavailable; do
         fi
         rm -f "$tmpfile"
         ;;
+    fnm)
+        # Node.js is managed by fnm on Linux and macOS, never by apt or
+        # Homebrew: distro packages lag behind, and `fnm install --lts` plus
+        # `fnm use`/`.node-version` is how versions are switched per project.
+        if ! has fnm; then
+            echo "==> installing fnm (not packaged by this Ubuntu release)"
+            tmpfile=$(mktemp)
+            if curl -fsSL https://fnm.vercel.app/install -o "$tmpfile"; then
+                # --skip-shell: fish and the Spacemacs config wire fnm up, and
+                # the installer would otherwise edit the login shell's rc file.
+                bash "$tmpfile" --skip-shell --install-dir "$HOME/.local/share/fnm" ||
+                    echo "warning: fnm installation failed" >&2
+            else
+                echo "warning: fnm download failed" >&2
+            fi
+            rm -f "$tmpfile"
+            hash -r 2>/dev/null || true
+        fi
+        if has fnm; then
+            echo "==> installing Node.js LTS with fnm (not with apt)"
+            fnm install --lts ||
+                echo "warning: fnm install --lts failed" >&2
+            fnm default lts-latest ||
+                echo "warning: fnm default failed" >&2
+            # Put the default Node.js (and its npm) on PATH for the prettier
+            # step below and for anything else later in this script. fnm infers
+            # the shell from the parent process, which is fish when chezmoi is
+            # launched from it, so force POSIX sh syntax here.
+            eval "$(fnm env --shell bash)"
+            hash -r 2>/dev/null || true
+        fi
+        ;;
     prettier)
         has prettier && continue
         if has npm; then
@@ -171,7 +206,7 @@ for pkg in $unavailable; do
             npm install -g --prefix "$HOME/.local" prettier ||
                 echo "warning: prettier installation failed" >&2
         else
-            echo "warning: prettier needs npm; install Node.js to enable it" >&2
+            echo "warning: prettier needs npm from fnm; skipping prettier" >&2
         fi
         ;;
     *)
@@ -248,8 +283,7 @@ gh
 lazygit
 uv
 ruff
-node
-prettier
+fnm
 shfmt
 diffutils
 wget
@@ -294,6 +328,36 @@ if [ -n "$missing_casks" ]; then
     echo "==> brew install --cask:$missing_casks"
     # shellcheck disable=SC2086  # word splitting of the cask list is intended
     brew install --cask $missing_casks
+fi
+
+# Node.js is managed by fnm on Linux and macOS, never by apt or Homebrew: the
+# distro formulae lag behind, and `fnm install --lts` plus `fnm use` or a
+# project `.node-version` is how versions are switched. The `node` and
+# `prettier` formulae are deliberately absent from BREW_PACKAGES because the
+# `prettier` formula would pull Node.js back in as a dependency.
+if command -v fnm >/dev/null 2>&1; then
+    echo "==> installing Node.js LTS with fnm (not with Homebrew)"
+    fnm install --lts ||
+        echo "warning: fnm install --lts failed" >&2
+    fnm default lts-latest ||
+        echo "warning: fnm default failed" >&2
+    # fnm infers the shell from the parent process; force sh syntax so the
+    # macOS branch also works when chezmoi is started from fish or zsh.
+    eval "$(fnm env --shell bash)"
+    hash -r 2>/dev/null || true
+
+    if command -v npm >/dev/null 2>&1; then
+        if ! command -v prettier >/dev/null 2>&1; then
+            echo "==> installing prettier (npm, user prefix)"
+            mkdir -p "$HOME/.local/bin"
+            npm install -g --prefix "$HOME/.local" prettier ||
+                echo "warning: prettier installation failed" >&2
+        fi
+    else
+        echo "warning: npm was not found; prettier was not installed" >&2
+    fi
+else
+    echo "warning: fnm is unavailable; Node.js and prettier were not installed" >&2
 fi
 
 echo "==> macOS packages complete"

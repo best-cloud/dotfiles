@@ -19,6 +19,20 @@ end
 {{ end -}}
 
 # ---------------------------------------------------------------------------
+# Node.js: managed by fnm, never by apt or Homebrew.
+# ---------------------------------------------------------------------------
+{{ if eq .chezmoi.os "linux" -}}
+# The package script installs the fnm binary and the Node.js versions here.
+fish_add_path --global ~/.local/share/fnm
+{{ end -}}
+
+# Put the default Node.js (and its npm) on PATH; --use-on-cd switches versions
+# automatically when a directory has a .node-version or .nvmrc file.
+if type -q fnm
+    fnm env --use-on-cd --shell fish | source
+end
+
+# ---------------------------------------------------------------------------
 # Debian/Ubuntu package names differ from the upstream binary names.
 # Defining these wrappers here keeps a single config file for all systems.
 # ---------------------------------------------------------------------------
