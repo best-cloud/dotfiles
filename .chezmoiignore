@@ -7,9 +7,15 @@ LICENSE
 .gitignore
 .github/**
 
-# Windows-only targets.
+# Windows-only targets. WezTerm is the Windows terminal and only opens WSL.
 {{ if ne .chezmoi.os "windows" -}}
 Documents/**
+.config/wezterm/**
+{{ end -}}
+
+# macOS-only targets. Ghostty is the macOS terminal.
+{{ if ne .chezmoi.os "darwin" -}}
+.config/ghostty/**
 {{ end -}}
 
 # Unix-only targets. Neovim and Zellij are kept because the Windows profile

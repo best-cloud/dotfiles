@@ -1,0 +1,44 @@
+{{ if eq .chezmoi.os "windows" -}}
+# Install the Spacemacs develop branch into Emacs' home directory (~/.emacs.d)
+# on the first apply. Rendered empty on other operating systems, so chezmoi
+# skips it there.
+$ErrorActionPreference = 'Continue'
+
+# Emacs on Windows defaults HOME to %APPDATA%\Roaming. Point it at the user
+# profile so Emacs, Git and the managed dotfiles share one home directory.
+# Only the persisted (User/Machine) value matters to GUI Emacs.
+$homeDir = [Environment]::GetEnvironmentVariable('HOME', 'User')
+if (-not $homeDir) {
+    $homeDir = [Environment]::GetEnvironmentVariable('HOME', 'Machine')
+}
+if (-not $homeDir) {
+    $homeDir = $env:USERPROFILE
+    [Environment]::SetEnvironmentVariable('HOME', $homeDir, 'User')
+    Write-Host "==> set user HOME=$homeDir"
+}
+
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    Write-Warning 'git is not installed; skipping the Spacemacs clone'
+    exit 0
+}
+
+$target = Join-Path $homeDir '.emacs.d'
+if (Test-Path (Join-Path $target '.git')) {
+    $branch = git -C $target rev-parse --abbrev-ref HEAD 2>$null
+    if ($branch -ne 'develop') {
+        Write-Warning "$target is on '$branch', not 'develop'. Switch with: git -C `"$target`" checkout develop"
+    }
+    exit 0
+}
+if (Test-Path $target) {
+    Write-Warning "$target exists but is not a git checkout; leaving it alone"
+    exit 0
+}
+
+Write-Host "==> cloning Spacemacs (develop) into $target"
+git clone --branch develop --depth 1 https://github.com/syl20bnr/spacemacs.git $target
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "git clone failed with exit code $LASTEXITCODE"
+    exit $LASTEXITCODE
+}
+{{ end -}}

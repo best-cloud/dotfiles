@@ -1,0 +1,31 @@
+{{ if ne .chezmoi.os "windows" -}}
+#!/bin/sh
+# Install the Spacemacs develop branch into ~/.emacs.d on the first apply.
+#
+# An existing checkout is never modified: Spacemacs updates itself from inside
+# Emacs. Package downloads happen on the first Emacs start, not here.
+set -eu
+
+if ! command -v git >/dev/null 2>&1; then
+    echo "warning: git is not installed; skipping the Spacemacs clone" >&2
+    exit 0
+fi
+
+target="$HOME/.emacs.d"
+if [ -d "$target/.git" ]; then
+    branch=$(git -C "$target" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+    if [ "$branch" != "develop" ]; then
+        echo "warning: $target is on '$branch', not 'develop'" >&2
+        echo "         switch with: git -C \"$target\" checkout develop" >&2
+    fi
+    exit 0
+fi
+if [ -e "$target" ]; then
+    echo "warning: $target exists but is not a git checkout; leaving it alone" >&2
+    exit 0
+fi
+
+echo "==> cloning Spacemacs (develop) into $target"
+git clone --branch develop --depth 1 \
+    https://github.com/syl20bnr/spacemacs.git "$target"
+{{ end -}}

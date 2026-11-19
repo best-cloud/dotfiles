@@ -1,0 +1,75 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/sh
+# Point Ubuntu's apt sources at the Tsinghua TUNA mirror in the deb822 format.
+# This repo targets the current Ubuntu LTS (26.04+), which uses
+# /etc/apt/sources.list.d/ubuntu.sources.
+# https://mirrors.tuna.tsinghua.edu.cn/help/ubuntu/
+#
+# Idempotent: the source file is rewritten only when its content differs. The
+# original is backed up once next to it, and third-party repositories in other
+# files are left untouched.
+#
+# Keep the bootstrap.sh copy of this logic in sync when changing it.
+set -eu
+
+[ -r /etc/os-release ] || exit 0
+# shellcheck disable=SC1091
+. /etc/os-release
+[ "${ID:-}" = ubuntu ] || exit 0
+
+case "$(uname -m)" in
+x86_64 | amd64) mirror=https://mirrors.tuna.tsinghua.edu.cn/ubuntu ;;
+aarch64 | arm64) mirror=https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports ;;
+*)
+    echo "warning: no TUNA mirror mapping for $(uname -m); keeping apt sources" >&2
+    exit 0
+    ;;
+esac
+
+codename="${VERSION_CODENAME:-${UBUNTU_CODENAME:-}}"
+if [ -z "$codename" ]; then
+    echo "warning: could not determine the Ubuntu codename; keeping apt sources" >&2
+    exit 0
+fi
+
+SUDO=""
+if [ "$(id -u)" -ne 0 ]; then
+    if command -v sudo >/dev/null 2>&1; then
+        SUDO=sudo
+    else
+        echo "warning: sudo is required to update apt sources; skipping" >&2
+        exit 0
+    fi
+fi
+
+sources=/etc/apt/sources.list.d/ubuntu.sources
+new=$(mktemp)
+cat >"$new" <<EOF
+# Managed by chezmoi: TUNA mirror, https://mirrors.tuna.tsinghua.edu.cn/help/ubuntu/
+Types: deb
+URIs: $mirror
+Suites: $codename $codename-updates $codename-backports
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb
+URIs: $mirror
+Suites: $codename-security
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+EOF
+
+if [ -f "$sources" ] && [ "$(cat "$new")" = "$(cat "$sources")" ]; then
+    rm -f "$new"
+    exit 0
+fi
+
+if [ -f "$sources" ] && [ ! -f "$sources.orig" ]; then
+    $SUDO cp -a "$sources" "$sources.orig"
+fi
+
+$SUDO mkdir -p /etc/apt/sources.list.d
+$SUDO install -m 0644 "$new" "$sources"
+rm -f "$new"
+echo "==> apt sources now use $mirror"
+{{ end -}}

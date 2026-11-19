@@ -1,0 +1,32 @@
+# Managed by chezmoi: dot_config/ghostty/config
+#
+# Primary terminal on macOS. Ghostty reads ~/.config/ghostty/config there via
+# the XDG search path.
+# Run `ghostty +list-themes` and `ghostty +list-fonts` to see local names.
+
+font-family = "JetBrainsMono Nerd Font"
+font-size = 14
+font-thicken = true
+
+# Built-in theme; Ghostty 1.2+ uses title case with spaces.
+theme = Catppuccin Mocha
+background-opacity = 0.95
+background-blur = true
+
+window-padding-x = 12
+window-padding-y = 10
+window-padding-balance = true
+macos-titlebar-style = transparent
+window-save-state = always
+
+mouse-hide-while-typing = true
+copy-on-select = clipboard
+scrollback-limit = 100000000
+
+# fish is the login shell managed by chezmoi.
+shell-integration = fish
+shell-integration-features = no-cursor
+cursor-style = bar
+cursor-style-blink = false
+
+keybind = cmd+enter=toggle_fullscreen

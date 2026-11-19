@@ -40,6 +40,57 @@ fi
 PATH="$HOME/.local/bin:$PATH"
 export PATH
 
+# Point apt at the Tsinghua TUNA mirror before installing prerequisites, so the
+# whole bootstrap is fast. Ubuntu 24.04+ (including the current LTS) uses the
+# deb822 format. Keep this in sync with
+# run_onchange_before_05-ubuntu-mirror.sh.tmpl.
+if [ -r /etc/os-release ] && command -v apt-get >/dev/null 2>&1; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    if [ "${ID:-}" = ubuntu ]; then
+        mirror=""
+        case "$(uname -m)" in
+        x86_64 | amd64) mirror=https://mirrors.tuna.tsinghua.edu.cn/ubuntu ;;
+        aarch64 | arm64) mirror=https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports ;;
+        esac
+        codename="${VERSION_CODENAME:-${UBUNTU_CODENAME:-}}"
+        if [ -n "$mirror" ] && [ -n "$codename" ] &&
+            { [ "$(id -u)" -eq 0 ] || command -v sudo >/dev/null 2>&1; }; then
+            MIRROR_SUDO=""
+            if [ "$(id -u)" -ne 0 ]; then
+                MIRROR_SUDO=sudo
+            fi
+            deb822=/etc/apt/sources.list.d/ubuntu.sources
+            new=$(mktemp)
+            cat >"$new" <<EOF
+# Managed by chezmoi: TUNA mirror, https://mirrors.tuna.tsinghua.edu.cn/help/ubuntu/
+Types: deb
+URIs: $mirror
+Suites: $codename $codename-updates $codename-backports
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb
+URIs: $mirror
+Suites: $codename-security
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+EOF
+            if [ -f "$deb822" ] && [ "$(cat "$new")" = "$(cat "$deb822")" ]; then
+                rm -f "$new"
+            else
+                if [ -f "$deb822" ] && [ ! -f "$deb822.orig" ]; then
+                    $MIRROR_SUDO cp -a "$deb822" "$deb822.orig"
+                fi
+                $MIRROR_SUDO mkdir -p /etc/apt/sources.list.d
+                $MIRROR_SUDO install -m 0644 "$new" "$deb822"
+                rm -f "$new"
+                echo "==> apt sources now use $mirror"
+            fi
+        fi
+    fi
+fi
+
 # `chezmoi init <repo>` clones with git, and the one-line bootstrap needs an
 # HTTP client before anything is installed. Fresh Ubuntu Server and WSL images
 # do not always ship git, so install the bootstrap prerequisites first.

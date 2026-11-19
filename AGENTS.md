@@ -55,6 +55,26 @@ agents otherwise get wrong.
   stay behind `eq .chezmoi.os "linux"` (this previously crashed `chezmoi init`
   on Windows).
 - Unix scripts are POSIX `sh` with `set -eu`; no bashisms.
+- Terminals are client-side and OS-specific. `dot_config/wezterm/wezterm.lua`
+  is Windows-only and WSL-only (no PowerShell/cmd launch menu);
+  `dot_config/ghostty/config` is macOS-only. Both are gated in
+  `.chezmoiignore`.
+- Keep `emacs` in the apt and Homebrew lists and `GNU.Emacs` in the winget
+  list. `run_onchange_after_30-spacemacs.*` clones the Spacemacs `develop`
+  branch only when `~/.emacs.d` is absent; never switch or overwrite an
+  existing checkout.
+- `dot_spacemacs` is the upstream develop template plus the TUNA ELPA snippet
+  copied verbatim from the develop section of the TUNA ELPA help page in
+  `dotspacemacs/user-init()`. On develop the override variable is
+  `configuration-layer-elpa-archives` (single dash), not the master-only
+  double-dash name. Do not rewrite the published snippet. The default GUI font
+  is JetBrainsMono NF 12 pt medium; the mode-line height uses
+  `:separator-scale 1.1`.
+- The deb822 TUNA apt-mirror logic exists twice: in `bootstrap.sh` (so the
+  prerequisites are fast) and in `run_onchange_before_05-ubuntu-mirror.sh.tmpl`
+  (so `chezmoi apply` enforces it). Keep the two copies in sync. Only
+  `/etc/apt/sources.list.d/ubuntu.sources` is written; the repo targets the
+  current Ubuntu LTS, so there is no legacy `sources.list` branch.
 - Prefer template data (`.name`, `.email`, `.editor`, `.isWSL`, `.isMacOS`,
   `.isWindows`) over per-OS duplicate files.
 
@@ -63,8 +83,10 @@ agents otherwise get wrong.
 - Profiles: `Documents/PowerShell/Microsoft.PowerShell_profile.ps1` (PS7) plus
   the 7-line `Documents/WindowsPowerShell/...` shim for 5.1. Add logic only to
   the PS7 file.
-- The profile sets `XDG_*` and `ZELLIJ_CONFIG_DIR` so Neovim, Starship and
-  Zellij read `~/.config`. Removing them silently breaks all three.
+- The profile sets `XDG_*` and `ZELLIJ_CONFIG_DIR` so Neovim, Starship, Zellij
+  and WezTerm read `~/.config`. Removing them silently breaks all four.
+- WezTerm is the Windows terminal and defaults to the `WSL:Ubuntu` domain.
+  There is no PowerShell/cmd launch entry; do not add one back.
 - The Nerd Font winget package is a machine-scope MSI and needs elevation;
   winget CLI shims live in `%LOCALAPPDATA%\Microsoft\WinGet\Links`.
 - If `Documents` is redirected to OneDrive, both profile targets miss. Check
