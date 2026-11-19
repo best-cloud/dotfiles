@@ -1,6 +1,7 @@
 -- Managed by chezmoi: dot_config/wezterm/wezterm.lua
 --
--- Primary terminal on Windows. It only opens WSL2 Ubuntu; there is no
+-- Alternative terminal on Windows for WSL-only sessions. Windows Terminal is
+-- the default client. This config only opens WSL2 Ubuntu; there is no
 -- PowerShell/cmd launch menu on purpose. Tuned for an RTX 4090 and a 2K
 -- (2560x1440) display at 100% scaling.
 --

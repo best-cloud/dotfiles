@@ -1,0 +1,74 @@
+{{ if eq .chezmoi.os "windows" -}}
+# Ensure the latest WSL2 and the Ubuntu distribution are installed.
+# Rendered empty on other operating systems, so chezmoi skips it there.
+$ErrorActionPreference = 'Continue'
+
+function Test-IsAdmin {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Get-WslDistros {
+    $output = & wsl.exe --list --quiet 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        return @()
+    }
+    # wsl.exe writes UTF-16LE when its output is redirected; strip the NULs
+    # before splitting so the names compare cleanly.
+    return @(($output -join "`n") -replace "`0", '' -split "`r?`n" |
+        ForEach-Object { $_.Trim() } | Where-Object { $_ })
+}
+
+if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
+    Write-Warning 'wsl.exe was not found. Run "wsl --install --no-distribution" from an elevated PowerShell, then re-run chezmoi apply.'
+    exit 0
+}
+
+# Installing or enabling the optional features needs an elevated shell.
+& wsl.exe --status *> $null
+if ($LASTEXITCODE -ne 0) {
+    if (-not (Test-IsAdmin)) {
+        Write-Warning 'WSL is not enabled yet. Run an elevated PowerShell and execute:'
+        Write-Warning '    wsl --install --no-distribution'
+        Write-Warning 'Reboot if asked, then re-run chezmoi apply.'
+        exit 0
+    }
+
+    Write-Host '==> enabling WSL2'
+    & wsl.exe --install --no-distribution
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning 'wsl --install failed; a reboot may be required. Re-run chezmoi apply afterwards.'
+        exit 0
+    }
+
+    # A reboot is normally required before WSL can be used.
+    & wsl.exe --status *> $null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning 'WSL was enabled but is not usable yet; reboot and re-run chezmoi apply.'
+        exit 0
+    }
+}
+
+Write-Host '==> setting WSL2 as the default version'
+& wsl.exe --set-default-version 2
+if ($LASTEXITCODE -ne 0) {
+    Write-Warning 'could not set the default WSL version to 2.'
+}
+
+# Ubuntu is the distribution name used by WezTerm and Windows Terminal. The
+# "Ubuntu" alias always installs the current LTS release.
+$distros = Get-WslDistros
+if ($distros -contains 'Ubuntu') {
+    Write-Host 'already installed: Ubuntu'
+} else {
+    Write-Host '==> installing Ubuntu'
+    & wsl.exe --install --distribution Ubuntu --no-launch
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning 'Ubuntu installation failed. From an elevated PowerShell, try:'
+        Write-Warning '    wsl --install --distribution Ubuntu'
+    } else {
+        Write-Host 'Ubuntu installed. Launch it once to create your Linux user.'
+    }
+}
+{{ end -}}

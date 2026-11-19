@@ -7,8 +7,10 @@ LICENSE
 .gitignore
 .github/**
 
-# Windows-only targets. WezTerm is the Windows terminal and only opens WSL.
+# Windows-only targets. Windows Terminal and WezTerm are the Windows clients;
+# Windows Terminal settings live under %LOCALAPPDATA%.
 {{ if ne .chezmoi.os "windows" -}}
+AppData/**
 Documents/**
 .config/wezterm/**
 {{ end -}}

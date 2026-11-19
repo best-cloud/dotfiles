@@ -29,7 +29,7 @@ agents otherwise get wrong.
 ## chezmoi rules that are easy to get wrong
 
 - `dot_x` maps to `~/.x`, `dot_config/y` to `~/.config/y`, everything else maps
-  under `$HOME`; `Documents/...` is Windows-only.
+  under `$HOME`; `Documents/...` and `AppData/...` are Windows-only.
 - `.tmpl` files are Go templates. `.chezmoiignore` and `run_onchange_*` are also
   templates, and `.chezmoiignore` patterns match **target** paths.
 - Every source file is a managed target unless listed in `.chezmoiignore`. New
@@ -85,8 +85,19 @@ agents otherwise get wrong.
   the PS7 file.
 - The profile sets `XDG_*` and `ZELLIJ_CONFIG_DIR` so Neovim, Starship, Zellij
   and WezTerm read `~/.config`. Removing them silently breaks all four.
-- WezTerm is the Windows terminal and defaults to the `WSL:Ubuntu` domain.
-  There is no PowerShell/cmd launch entry; do not add one back.
+- Windows Terminal is the default Windows client. Its settings are the managed
+  target `AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json`,
+  which must stay in `.chezmoiignore` on non-Windows. PowerShell 7 is
+  `defaultProfile` (GUID `{574e775e-4f2a-5b96-ac1e-a2962a402336}`); the Ubuntu
+  profile runs `wsl.exe -d Ubuntu --cd ~`.
+- WezTerm remains installed as the WSL-only alternative and defaults to the
+  `WSL:Ubuntu` domain. There is no PowerShell/cmd launch entry; do not add one
+  back.
+- `Microsoft.WindowsTerminal` and `Microsoft.WSL` belong in the winget list.
+  Ubuntu is provisioned by `run_onchange_after_40-wsl.ps1.tmpl` with
+  `wsl --install --distribution Ubuntu --no-launch`, not by a winget distro
+  package, so it always tracks the current LTS. The first enablement needs an
+  elevated shell; the script warns instead of failing when it is not elevated.
 - The Nerd Font winget package is a machine-scope MSI and needs elevation;
   winget CLI shims live in `%LOCALAPPDATA%\Microsoft\WinGet\Links`.
 - If `Documents` is redirected to OneDrive, both profile targets miss. Check
@@ -97,3 +108,7 @@ agents otherwise get wrong.
 - `dot_config/starship.toml` is the verbatim `catppuccin-powerline` preset.
   Regenerate with `starship preset catppuccin-powerline -o dot_config/starship.toml`
   instead of hand-editing; the prompt requires the JetBrainsMono NF font.
+- The `Catppuccin Mocha` scheme and theme in the Windows Terminal settings are
+  copied verbatim from <https://github.com/catppuccin/windows-terminal>
+  (`mocha.json` and `mochaTheme.json`). Do not retype or reorder those colors;
+  copy the upstream files again when they change.

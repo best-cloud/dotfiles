@@ -11,8 +11,10 @@ Design principles:
 - **One file where one file is enough** — a single fish config, a single
   Starship config, a single Git config, a single Neovim config. Templates are
   used only where values or OS differences require them.
-- **One terminal per desktop** — WezTerm on Windows (WSL2 Ubuntu sessions only)
-  and Ghostty on macOS. Ubuntu Server and WSL render in the client terminal.
+- **One primary terminal per desktop** — Windows Terminal on Windows
+  (PowerShell 7 by default, plus WSL2 Ubuntu) and Ghostty on macOS. WezTerm
+  remains available for WSL-only sessions. Ubuntu Server and WSL render in the
+  client terminal.
 - **fish first** on Ubuntu and macOS: installed, configured, and set as the
   login shell.
 - **Emacs everywhere** — Emacs plus Spacemacs (`~/.emacs.d`) on all platforms.
@@ -81,7 +83,8 @@ GitHub (SSH key or `gh auth login`), or pass an SSH URL through
 | Modern CLI | ripgrep, fd-find, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq |
 | Editors / multiplexers | neovim, emacs, zellij | neovim, emacs, zellij | Neovim, Emacs, Zellij |
 | Dev tools | gh, direnv, uv, lazygit | gh, direnv, uv, lazygit | gh, uv, lazygit |
-| Terminal | — (client terminal) | Ghostty | WezTerm (WSL2 only) |
+| Terminal | — (client terminal) | Ghostty | Windows Terminal, WezTerm |
+| WSL2 / Ubuntu | — (native) | — | Microsoft.WSL + latest Ubuntu LTS |
 | Terminal font | — (client terminal) | JetBrainsMono Nerd Font | JetBrainsMono Nerd Font |
 | Editor config | Spacemacs in `~/.emacs.d` | Spacemacs in `~/.emacs.d` | Spacemacs in `%USERPROFILE%\.emacs.d` |
 
@@ -136,8 +139,11 @@ production machine needs immediate security updates.
 │   ├── starship.toml                   # catppuccin-powerline preset, all OSes
 │   ├── zellij/config.kdl               # shared; Windows uses ZELLIJ_CONFIG_DIR
 │   ├── nvim/init.lua                   # plugin-free, works offline
-│   ├── wezterm/wezterm.lua             # Windows terminal, WSL2 Ubuntu only
+│   ├── wezterm/wezterm.lua             # WezTerm (alternative), WSL2 Ubuntu only
 │   └── ghostty/config                  # macOS terminal
+├── AppData/
+│   └── Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/
+│       └── LocalState/settings.json    # Windows Terminal, Catppuccin Mocha
 ├── Documents/
 │   ├── PowerShell/
 │   │   └── Microsoft.PowerShell_profile.ps1        # PowerShell 7
@@ -148,7 +154,8 @@ production machine needs immediate security updates.
 ├── run_onchange_before_10-install-packages.ps1.tmpl   # winget
 ├── run_onchange_after_20-default-shell.sh.tmpl        # chsh to fish
 ├── run_onchange_after_30-spacemacs.sh.tmpl            # clone Spacemacs (Unix)
-└── run_onchange_after_30-spacemacs.ps1.tmpl           # clone Spacemacs (Windows)
+├── run_onchange_after_30-spacemacs.ps1.tmpl           # clone Spacemacs (Windows)
+└── run_onchange_after_40-wsl.ps1.tmpl                 # WSL2 + Ubuntu
 ```
 
 ## How the scripts work
@@ -227,7 +234,29 @@ starship preset catppuccin-powerline -o dot_config/starship.toml
 
 ## Terminals
 
-### Windows: WezTerm
+### Windows: Windows Terminal
+
+`AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json`
+is applied to the packaged Windows Terminal settings file. It:
+
+- makes PowerShell 7 the `defaultProfile` (profile GUID
+  `{574e775e-4f2a-5b96-ac1e-a2962a402336}`, the `Windows.Terminal.PowershellCore`
+  source);
+- adds an Ubuntu profile that runs `wsl.exe -d Ubuntu --cd ~`, and disables the
+  generated WSL/Azure/Visual Studio profile sources so the profile list stays
+  deterministic;
+- matches the managed WezTerm appearance: Catppuccin Mocha, JetBrainsMono Nerd
+  Font medium at 12 pt, 1.1 cell height, 92% acrylic opacity, a hidden tab row
+  when only one tab is open, 100k-line scrollback and a 160x44 initial window;
+- embeds the `Catppuccin Mocha` color scheme and terminal theme copied verbatim
+  from <https://github.com/catppuccin/windows-terminal> (`mocha.json` and
+  `mochaTheme.json`).
+
+Windows Terminal reads the file at startup; use Ctrl+Shift+Comma to open the
+JSON file, or restart the app, after `chezmoi apply` changes it. The path is
+under `%LOCALAPPDATA%` and is unaffected by a redirected `Documents` folder.
+
+### Windows: WezTerm (WSL-only)
 
 `dot_config/wezterm/wezterm.lua` is applied to
 `~/.config/wezterm/wezterm.lua`. It sets `WSL:Ubuntu` as the default domain and
@@ -266,9 +295,19 @@ inside Ghostty with Cmd+Shift+Comma; `ghostty +list-themes` and
 - PowerShell 7 is installed first by the winget script. The script itself is
   compatible with Windows PowerShell 5.1 in case chezmoi starts under it.
 - The Nerd Font ships as a machine-scope MSI, so install it from an elevated
-  window. WezTerm's managed config already selects `JetBrainsMono Nerd Font`.
-- WezTerm is installed instead of Windows Terminal and opens WSL2 directly.
-  Run `bootstrap.sh` inside the WSL distro as well; the two sides are
+  window. The managed Windows Terminal and WezTerm configs both select
+  `JetBrainsMono Nerd Font`.
+- Windows Terminal is the default Windows client and opens PowerShell 7; its
+  managed settings live under
+  `%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState`.
+  WezTerm stays installed for WSL-only sessions and opens WSL2 directly.
+- `run_onchange_after_40-wsl.ps1.tmpl` sets WSL2 as the default version and
+  registers the `Ubuntu` distribution when it is missing. The first
+  `wsl --install` that enables the optional Windows features needs an elevated
+  shell and sometimes a reboot; the script prints the exact command and exits
+  cleanly when it is not elevated. Launch Ubuntu once after it is registered to
+  create the Linux user.
+- Run `bootstrap.sh` inside the WSL distro as well; the two sides are
   independent chezmoi installations.
 
 ## Emacs and Spacemacs
@@ -377,6 +416,14 @@ chezmoi verify
 - **WezTerm opens PowerShell or cannot find the WSL distro** — the distro name
   in `dot_config/wezterm/wezterm.lua` must match `wsl --list --quiet`; update
   `distribution` and reload the config.
+- **Windows Terminal still shows old settings or duplicate Ubuntu profiles** —
+  restart Windows Terminal after `chezmoi apply`. If the distro is not named
+  `Ubuntu`, update the `Ubuntu` profile commandline in
+  `AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json`.
+- **WSL/Ubuntu was not installed** — the first `wsl --install` needs an elevated
+  PowerShell and possibly a reboot. Run `wsl --install --no-distribution`, reboot
+  if asked, then re-run `chezmoi apply` (delete the
+  `40-wsl.ps1` `entryState` key to force it).
 - **Spacemacs did not clone** — check `chezmoi apply` output. A pre-existing
   `~/.emacs.d` that is not a git checkout is intentionally left alone, and the
   clone needs git plus network access. An existing checkout on another branch

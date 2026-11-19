@@ -1,0 +1,113 @@
+{
+    "$help": "https://aka.ms/terminal-documentation",
+    "$schema": "https://aka.ms/terminal-profiles-schema",
+    "defaultProfile": "{574e775e-4f2a-5b96-ac1e-a2962a402336}",
+    "disabledProfileSources":
+    [
+        "Microsoft.WSL",
+        "Windows.Terminal.Azure",
+        "Windows.Terminal.VisualStudio"
+    ],
+    "initialCols": 160,
+    "initialRows": 44,
+    "alwaysShowTabs": false,
+    "showTabsInTitlebar": true,
+    "theme": "Catppuccin Mocha",
+    "profiles":
+    {
+        "defaults":
+        {
+            "colorScheme": "Catppuccin Mocha",
+            "font":
+            {
+                "face": "JetBrainsMono Nerd Font",
+                "size": 12,
+                "weight": "medium",
+                "cellHeight": "1.1"
+            },
+            "useAcrylic": true,
+            "opacity": 92,
+            "padding": "8, 4, 8, 4",
+            "historySize": 100000,
+            "cursorShape": "bar"
+        },
+        "list":
+        [
+            {
+                "guid": "{574e775e-4f2a-5b96-ac1e-a2962a402336}",
+                "name": "PowerShell 7",
+                "source": "Windows.Terminal.PowershellCore",
+                "hidden": false
+            },
+            {
+                "guid": "{a5b1c3d4-6e7f-4a8b-9c0d-1e2f3a4b5c6d}",
+                "name": "Ubuntu",
+                "commandline": "wsl.exe -d Ubuntu --cd ~",
+                "hidden": false
+            },
+            {
+                "guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
+                "name": "Windows PowerShell",
+                "commandline": "%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+                "hidden": false
+            },
+            {
+                "guid": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}",
+                "name": "Command Prompt",
+                "commandline": "%SystemRoot%\\System32\\cmd.exe",
+                "hidden": false
+            }
+        ]
+    },
+    "schemes":
+    [
+        {
+            "name": "Catppuccin Mocha",
+
+            "cursorColor": "#F5E0DC",
+            "selectionBackground": "#585B70",
+
+            "background": "#1E1E2E",
+            "foreground": "#CDD6F4",
+
+            "black": "#45475A",
+            "red": "#F38BA8",
+            "green": "#A6E3A1",
+            "yellow": "#F9E2AF",
+            "blue": "#89B4FA",
+            "purple": "#F5C2E7",
+            "cyan": "#94E2D5",
+            "white": "#BAC2DE",
+
+            "brightBlack": "#585B70",
+            "brightRed": "#F38BA8",
+            "brightGreen": "#A6E3A1",
+            "brightYellow": "#F9E2AF",
+            "brightBlue": "#89B4FA",
+            "brightPurple": "#F5C2E7",
+            "brightCyan": "#94E2D5",
+            "brightWhite": "#A6ADC8"
+        }
+    ],
+    "themes":
+    [
+        {
+            "name": "Catppuccin Mocha",
+            "tab":
+            {
+                "background": "#1E1E2EFF",
+                "showCloseButton": "always",
+                "unfocusedBackground": null
+            },
+            "tabRow":
+            {
+                "background": "#181825FF",
+                "unfocusedBackground": "#11111BFF"
+            },
+            "window":
+            {
+                "applicationTheme": "dark"
+            }
+        }
+    ]
+}
