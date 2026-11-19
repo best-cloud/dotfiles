@@ -32,6 +32,14 @@ if (-not $env:HOME) {
 # ~/.config/zellij/config.kdl managed by chezmoi.
 $env:ZELLIJ_CONFIG_DIR = Join-Path $HOME '.config\zellij'
 
+# Zellij opens cmd.exe for new panes when SHELL is unset. Point it at the
+# PowerShell that loaded this profile so panes start in PowerShell instead.
+if ($PSVersionTable.PSVersion.Major -ge 6) {
+    $env:SHELL = 'pwsh'
+} else {
+    $env:SHELL = 'powershell'
+}
+
 # ---------------------------------------------------------------------------
 # Prompt
 # ---------------------------------------------------------------------------

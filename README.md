@@ -292,6 +292,10 @@ inside Ghostty with Cmd+Shift+Comma; `ghostty +list-themes` and
   Neovim, Starship, Zellij and WezTerm use the same managed config files as
   Linux/macOS instead of duplicating them in `%LOCALAPPDATA%`. Zellij ignores
   `XDG_CONFIG_HOME` on Windows, so the profile also sets `ZELLIJ_CONFIG_DIR`.
+- The profile sets `SHELL` to `pwsh` under PowerShell 7 and to `powershell`
+  under Windows PowerShell 5.1, so Zellij panes start in PowerShell instead of
+  falling back to `cmd.exe`. The 5.1 shim dot-sources the PS7 profile, and the
+  version check keeps each shell pointing at itself.
 - PowerShell 7 is installed first by the winget script. The script itself is
   compatible with Windows PowerShell 5.1 in case chezmoi starts under it.
 - The Nerd Font ships as a machine-scope MSI, so install it from an elevated

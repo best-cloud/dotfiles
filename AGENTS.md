@@ -84,7 +84,9 @@ agents otherwise get wrong.
   the 7-line `Documents/WindowsPowerShell/...` shim for 5.1. Add logic only to
   the PS7 file.
 - The profile sets `XDG_*` and `ZELLIJ_CONFIG_DIR` so Neovim, Starship, Zellij
-  and WezTerm read `~/.config`. Removing them silently breaks all four.
+  and WezTerm read `~/.config`. Removing them silently breaks all four. It also
+  sets `SHELL` (`pwsh` on 7, `powershell` on 5.1) so Zellij panes do not fall
+  back to `cmd.exe`; keep the version check because 5.1 dot-sources this file.
 - Windows Terminal is the default Windows client. Its settings are the managed
   target `AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json`,
   which must stay in `.chezmoiignore` on non-Windows. PowerShell 7 is
