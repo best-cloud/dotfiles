@@ -5,13 +5,14 @@
 # Run `ghostty +list-themes` and `ghostty +list-fonts` to see local names.
 #
 # The text area (font, palette, background and padding) is kept close to the
-# managed WezTerm look. Window chrome, sizing and macOS window behavior are
-# Ghostty's own; this is not a WezTerm clone. Keep only the text-area settings
-# in sync when changing fonts or colors.
+# managed WezTerm look, except the size: 14 pt suits the MacBook Air display
+# where WezTerm's 12 pt is sized for the 2K Windows screen. Window chrome,
+# sizing and macOS window behavior are Ghostty's own; this is not a WezTerm
+# clone. Keep only the text-area settings in sync when changing fonts or colors.
 
 font-family = "JetBrainsMono Nerd Font"
 font-style = "Medium"
-font-size = 12
+font-size = 14
 # Slightly taller cells, close to WezTerm's 1.1 line height.
 adjust-cell-height = 10%
 

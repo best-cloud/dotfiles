@@ -380,8 +380,9 @@ old unmanaged `~/.wezterm.lua` is ignored and can be deleted.
 
 Homebrew installs the `ghostty` cask, and `dot_config/ghostty/config` is applied
 to `~/.config/ghostty/config`. Its text area is kept close to the WezTerm look:
-JetBrainsMono Nerd Font Medium at 12 pt, slightly taller cells, Catppuccin
-Mocha, 92% opacity with a blurred background and matching text padding. Window
+JetBrainsMono Nerd Font Medium at 14 pt (larger than WezTerm's 12 pt, which is
+sized for the 2K Windows screen), slightly taller cells, Catppuccin Mocha, 92%
+opacity with a blurred background and matching text padding. Window
 chrome, initial window size and macOS window behavior are left to Ghostty
 instead of imitating WezTerm's Windows-oriented decoration. It also uses fish
 shell integration. Only the left Option key acts as Alt, and Alt+Left/Right are
