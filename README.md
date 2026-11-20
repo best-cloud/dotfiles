@@ -147,7 +147,8 @@ formula, because that formula depends on Homebrew's Node.js. Installing it into
 Windows and macOS can also install a personal set of daily-use applications.
 They are opt-in because not every machine wants them: `chezmoi init` asks once
 and defaults to no, and the answer is stored as `installOptionalApps` in
-`~/.config/chezmoi/chezmoi.toml`.
+`~/.config/chezmoi/chezmoi.toml`. At the prompt, enter `y` (or `yes`/`true`) to
+install the list, or `n` (or `no`/`false`, or just Enter) to skip it.
 
 - macOS (Homebrew casks): `1password`, `google-chrome`, `notion`,
   `onlyoffice`, `iina`, `wechat`, `neteasemusic`.
