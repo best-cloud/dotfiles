@@ -94,7 +94,7 @@ GitHub (SSH key or `gh auth login`), or pass an SSH URL through
 | Dev tools | gh, direnv, uv, lazygit, mosh | gh, direnv, uv, lazygit, mosh, WeChat DevTools, Postman | gh, uv, lazygit, WeChat DevTools, Postman (mosh via WSL) |
 | Containers | podman | podman | — |
 | Node.js | fnm + Node.js LTS (no apt) | fnm + Node.js LTS (no Homebrew) | Node.js LTS (winget) |
-| AI / Python tooling | opencode, ruff, ollama | opencode, ruff, ollama | OpenCode, Ruff, Ollama |
+| AI / Python tooling | opencode, ruff, ollama | opencode, ruff, ollama | OpenCode, Ruff (ollama via WSL) |
 | Formatters | prettier, shfmt | prettier, shfmt | Prettier, shfmt |
 | Optional daily-use apps | — | see below | see below |
 | Terminal | — (client terminal) | Ghostty | Windows Terminal, WezTerm |
@@ -125,8 +125,8 @@ client library), so the Linux script installs Ollama with the upstream installer
 at <https://ollama.com/install.sh>. That installer needs root, so it runs through
 `sudo` when the script is not already root. In WSL without systemd the binary is
 still installed; start the server with `ollama serve`. macOS gets both from
-Homebrew (`mosh` and `ollama` formulae), and Windows installs `Ollama.Ollama`
-from winget.
+Homebrew (`mosh` and `ollama` formulae). Windows deliberately does not install
+Ollama natively; use `ollama` from the WSL2 Ubuntu distribution instead.
 
 mosh is installed on both Ubuntu Server and WSL (the same apt package), and on
 macOS. It has no native Windows build or winget package, so on Windows it is

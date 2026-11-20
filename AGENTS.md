@@ -56,6 +56,7 @@ agents otherwise get wrong.
   branch installs it in both Ubuntu Server and WSL2 Ubuntu. ollama is
   not packaged by apt (only the `python3-ollama` client library), so the Linux
   branch installs it with the upstream `https://ollama.com/install.sh` script.
+  It is also not installed natively on Windows: use the WSL2 Ollama.
 - Desktop-only extras are intentional: WeChat DevTools and Postman are
   development tools installed on macOS (`postman`, `wechatwebdevtools` casks)
   and Windows (`Postman.Postman`, `Tencent.WeixinDevTools`), not on Linux. The
