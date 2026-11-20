@@ -315,9 +315,8 @@ genuinely differ.
 - sources `~/.config/fish/local.fish` if it exists for machine-local tweaks.
 
 The PowerShell 7 profile defines the same aliases and abbreviations, so both
-shells behave the same way on Windows, except for `e` → `emacs -nw`: Windows
-uses the Emacs GUI only, so the profile has no `e`. The 5.1 shim inherits
-everything else by dot-sourcing that profile.
+shells behave the same way on Windows. The 5.1 shim inherits everything by
+dot-sourcing that profile.
 
 `run_onchange_after_20-default-shell.sh.tmpl` adds the fish path to
 `/etc/shells` when needed and runs `chsh`. Log out and back in (or run
@@ -476,6 +475,13 @@ On Windows the script also sets the user-scope `HOME` variable to
 `%APPDATA%\Roaming` as `~`, which would miss `~/.emacs.d` and the managed
 dotfiles. The PowerShell profile mirrors that value into the current session;
 open a new shell (or sign out) after the first apply so GUI Emacs picks it up.
+
+The GNU Emacs installer does not add its versioned
+`C:\Program Files\Emacs\emacs-*\bin` directory to `PATH`. The PowerShell profile
+resolves the newest installed version and prepends its `bin` directory, so
+terminal sessions get `emacs`, `emacsclient` and `etags` without pinning a
+version that breaks on the next Emacs upgrade. The `e` abbreviation opens
+`emacs -nw`, matching fish.
 
 ## Machine-specific values
 

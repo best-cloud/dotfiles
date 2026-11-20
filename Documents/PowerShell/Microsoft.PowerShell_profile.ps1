@@ -15,6 +15,21 @@ if ((Test-Path $wingetLinks) -and ($env:Path -notlike "*$wingetLinks*")) {
     $env:Path = "$wingetLinks;$env:Path"
 }
 
+# GNU Emacs installs into a versioned directory (for example
+# C:\Program Files\Emacs\emacs-31.1\bin) and its installer does not add that
+# directory to PATH, so resolve the newest install for terminal sessions.
+$emacsRoot = Join-Path $env:ProgramFiles 'Emacs'
+if (Test-Path $emacsRoot) {
+    $emacsBin = Get-ChildItem $emacsRoot -Directory -Filter 'emacs-*' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^emacs-\d+(\.\d+)*$' } |
+        Sort-Object { [version]($_.Name -replace '^emacs-', '') } -Descending |
+        Select-Object -First 1 |
+        ForEach-Object { Join-Path $_.FullName 'bin' }
+    if ($emacsBin -and (Test-Path (Join-Path $emacsBin 'emacs.exe')) -and ($env:Path -notlike "*$emacsBin*")) {
+        $env:Path = "$emacsBin;$env:Path"
+    }
+}
+
 # ---------------------------------------------------------------------------
 # Environment
 # ---------------------------------------------------------------------------
@@ -105,7 +120,9 @@ if (Get-Command lazygit -ErrorAction SilentlyContinue) {
 if (Get-Command nvim -ErrorAction SilentlyContinue) {
     Set-Alias -Name vi -Value nvim -Force
 }
-# No `e` -> `emacs -nw` here: on Windows Emacs is used through its GUI only.
+if (Get-Command emacs -ErrorAction SilentlyContinue) {
+    function e { emacs -nw @args }
+}
 if (Get-Command zellij -ErrorAction SilentlyContinue) {
     Set-Alias -Name zj -Value zellij -Force
     function za { zellij attach -c @args }
