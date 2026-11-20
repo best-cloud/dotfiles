@@ -353,9 +353,10 @@ is applied to the packaged Windows Terminal settings file. It:
 - adds an Ubuntu profile that runs `wsl.exe -d Ubuntu --cd ~`, and disables the
   generated WSL/Azure/Visual Studio profile sources so the profile list stays
   deterministic;
-- matches the managed WezTerm appearance: Catppuccin Mocha, JetBrainsMono Nerd
-  Font medium at 12 pt, 1.1 cell height, 92% acrylic opacity, a hidden tab row
-  when only one tab is open, 100k-line scrollback and a 160x44 initial window;
+- matches the managed WezTerm font and sizing: Catppuccin Mocha, JetBrainsMono
+  Nerd Font medium at 12 pt, 1.1 cell height, 92% acrylic opacity, a hidden tab
+  row when only one tab is open, 100k-line scrollback and a 160x44 initial
+  window;
 - embeds the `Catppuccin Mocha` color scheme and terminal theme copied verbatim
   from <https://github.com/catppuccin/windows-terminal> (`mocha.json` and
   `mochaTheme.json`).
@@ -373,22 +374,25 @@ another name (for example `Ubuntu-24.04`), change `distribution` in the config.
 
 The config uses the WebGpu front end, the high-performance GPU preference, a
 120 fps cap and a 100k-line scrollback, sized for a 2K display at 100% scaling.
+The window is fully opaque: `win32_system_backdrop` and
+`window_background_opacity` are deliberately not set because the Acrylic/Mica
+backdrop path has driver compatibility problems with NVIDIA GPUs on Windows.
 WezTerm checks `~/.config/wezterm/wezterm.lua` before `~/.wezterm.lua`, so an
 old unmanaged `~/.wezterm.lua` is ignored and can be deleted.
 
 ### macOS: Ghostty
 
 Homebrew installs the `ghostty` cask, and `dot_config/ghostty/config` is applied
-to `~/.config/ghostty/config`. Its text area is kept close to the WezTerm look:
-JetBrainsMono Nerd Font Medium at 14 pt (larger than WezTerm's 12 pt, which is
-sized for the 2K Windows screen), slightly taller cells, Catppuccin Mocha, 92%
-opacity with a blurred background and matching text padding. Window
-chrome, initial window size and macOS window behavior are left to Ghostty
-instead of imitating WezTerm's Windows-oriented decoration. It also uses fish
-shell integration. Only the left Option key acts as Alt, and Alt+Left/Right are
-unbound so the shell gets them for word-wise movement. Reload from inside
-Ghostty with Cmd+Shift+Comma; `ghostty +list-themes` and `ghostty +list-fonts`
-show the names available on the machine.
+to `~/.config/ghostty/config`. It uses the same JetBrainsMono Nerd Font Medium
+and Catppuccin Mocha as WezTerm, with slightly taller cells and matching text
+padding, but 14 pt (larger than WezTerm's 12 pt, which is sized for the 2K
+Windows screen) and 92% opacity with a blurred background where WezTerm stays
+opaque. Window chrome, initial window size and macOS window behavior are left
+to Ghostty instead of imitating WezTerm's Windows-oriented decoration. It also
+uses fish shell integration. Only the left Option key acts as Alt, and
+Alt+Left/Right are unbound so the shell gets them for word-wise movement.
+Reload from inside Ghostty with Cmd+Shift+Comma; `ghostty +list-themes` and
+`ghostty +list-fonts` show the names available on the machine.
 
 ## Windows notes
 

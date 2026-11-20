@@ -35,10 +35,9 @@ config.max_fps = 120
 config.animation_fps = 60
 -- The GPU has VRAM to spare, so keep a deep history.
 config.scrollback_lines = 100000
--- Windows 11 Acrylic backdrop. It costs a little GPU work; the 4090 does not
--- notice, and the opacity below is what makes the effect visible.
-config.win32_system_backdrop = 'Acrylic'
-config.window_background_opacity = 0.92
+-- No win32_system_backdrop or window_background_opacity: the Acrylic/Mica
+-- backdrop path crashes or renders badly with NVIDIA drivers on Windows, so
+-- the window stays opaque.
 
 -- ---------------------------------------------------------------------------
 -- 2K screen (100% scaling)
