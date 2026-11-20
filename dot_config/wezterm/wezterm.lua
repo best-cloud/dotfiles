@@ -60,7 +60,6 @@ config.window_padding = {
 -- ---------------------------------------------------------------------------
 config.color_scheme = 'Catppuccin Mocha'
 config.window_decorations = 'INTEGRATED_BUTTONS|RESIZE'
-config.hide_tab_bar_if_only_one_tab = true
 -- Avoid IME conflicts with some Windows input methods.
 config.use_dead_keys = false
 
