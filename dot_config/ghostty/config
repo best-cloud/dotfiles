@@ -3,24 +3,33 @@
 # Primary terminal on macOS. Ghostty reads ~/.config/ghostty/config there via
 # the XDG search path.
 # Run `ghostty +list-themes` and `ghostty +list-fonts` to see local names.
+#
+# The text area (font, palette, background and padding) is kept close to the
+# managed WezTerm look. Window chrome, sizing and macOS window behavior are
+# Ghostty's own; this is not a WezTerm clone. Keep only the text-area settings
+# in sync when changing fonts or colors.
 
 font-family = "JetBrainsMono Nerd Font"
-font-size = 14
-font-thicken = true
+font-style = "Medium"
+font-size = 12
+# Slightly taller cells, close to WezTerm's 1.1 line height.
+adjust-cell-height = 10%
 
 # Built-in theme; Ghostty 1.2+ uses title case with spaces.
 theme = Catppuccin Mocha
-background-opacity = 0.95
+background-opacity = 0.92
 background-blur = true
 
-window-padding-x = 12
-window-padding-y = 10
+# Text-area padding; balance evens out the leftover pixels.
+window-padding-x = 8
+window-padding-y = 7
 window-padding-balance = true
 macos-titlebar-style = transparent
 window-save-state = always
 
 mouse-hide-while-typing = true
 copy-on-select = clipboard
+# Deep scrollback per terminal surface.
 scrollback-limit = 100000000
 
 # fish is the login shell managed by chezmoi.

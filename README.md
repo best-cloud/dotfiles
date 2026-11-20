@@ -82,11 +82,12 @@ GitHub (SSH key or `gh auth login`), or pass an SSH URL through
 | Core CLI | git, curl, wget, build-essential, unzip, zip | git, wget | Git |
 | Modern CLI | ripgrep, fd-find, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq |
 | Editors / multiplexers | neovim, emacs, zellij | neovim, emacs, zellij | Neovim, Emacs, Zellij |
-| Dev tools | gh, direnv, uv, lazygit | gh, direnv, uv, lazygit | gh, uv, lazygit |
+| Dev tools | gh, direnv, uv, lazygit | gh, direnv, uv, lazygit, WeChat DevTools, Postman | gh, uv, lazygit, WeChat DevTools, Postman |
 | Containers | podman | podman | — |
 | Node.js | fnm + Node.js LTS (no apt) | fnm + Node.js LTS (no Homebrew) | Node.js LTS (winget) |
 | AI / Python tooling | opencode, ruff | opencode, ruff | OpenCode, Ruff |
 | Formatters | prettier, shfmt | prettier, shfmt | Prettier, shfmt |
+| Optional daily-use apps | — | see below | see below |
 | Terminal | — (client terminal) | Ghostty | Windows Terminal, WezTerm |
 | WSL2 / Ubuntu | — (native) | — | Microsoft.WSL + latest Ubuntu LTS |
 | Terminal font | — (client terminal) | JetBrainsMono Nerd Font | JetBrainsMono Nerd Font |
@@ -140,6 +141,31 @@ every platform, including macOS. It is deliberately not the Homebrew `prettier`
 formula, because that formula depends on Homebrew's Node.js. Installing it into
 `~/.local` keeps `prettier` on `PATH` regardless of which fnm version is active.
 `shfmt` comes from apt, Homebrew and winget.
+
+### Optional daily-use apps
+
+Windows and macOS can also install a personal set of daily-use applications.
+They are opt-in because not every machine wants them: `chezmoi init` asks once
+and defaults to no, and the answer is stored as `installOptionalApps` in
+`~/.config/chezmoi/chezmoi.toml`.
+
+- macOS (Homebrew casks): `1password`, `google-chrome`, `notion`,
+  `onlyoffice`, `iina`, `wechat`, `neteasemusic`.
+- Windows (winget): `AgileBits.1Password`, `Flow-Launcher.Flow-Launcher`,
+  `Google.Chrome.EXE`, `Notion.Notion`, `ONLYOFFICE.DesktopEditors`,
+  `Daum.PotPlayer`, `SumatraPDF.SumatraPDF`, `Tencent.WeChat.Universal`,
+  `NetEase.CloudMusic`.
+
+The optional lists are deliberately disjoint from the mandatory package lists:
+do not add a package to both stages. The main install scripts own development
+tools and shared CLI utilities; the optional scripts own personal applications.
+
+To enable it on an existing machine, add `installOptionalApps = true` under
+`[data]` in `~/.config/chezmoi/chezmoi.toml` and run `chezmoi apply`; set it to
+false to stop managing the list. `run_onchange_after_50-optional-apps.*` only
+runs when the value is true. These lists are desktop-only by design: Linux
+installs no personal applications. The WeChat DevTools and Postman packages are
+development tools and are installed unconditionally on macOS and Windows.
 
 ## Ubuntu mirror (TUNA)
 
@@ -196,7 +222,9 @@ production machine needs immediate security updates.
 ├── run_onchange_after_20-default-shell.sh.tmpl        # chsh to fish
 ├── run_onchange_after_30-spacemacs.sh.tmpl            # clone Spacemacs (Unix)
 ├── run_onchange_after_30-spacemacs.ps1.tmpl           # clone Spacemacs (Windows)
-└── run_onchange_after_40-wsl.ps1.tmpl                 # WSL2 + Ubuntu
+├── run_onchange_after_40-wsl.ps1.tmpl                 # WSL2 + Ubuntu
+├── run_onchange_after_50-optional-apps.sh.tmpl        # optional macOS apps
+└── run_onchange_after_50-optional-apps.ps1.tmpl       # optional Windows apps
 ```
 
 ## How the scripts work
@@ -225,6 +253,10 @@ chezmoi apply
 1. Add the package name to the relevant list in
    `run_onchange_before_10-install-packages.sh.tmpl` (apt and Homebrew lists)
    and/or `run_onchange_before_10-install-packages.ps1.tmpl` (winget ID).
+   Personal daily-use applications belong in
+   `run_onchange_after_50-optional-apps.sh.tmpl` (Homebrew) or
+   `run_onchange_after_50-optional-apps.ps1.tmpl` (winget); those scripts only
+   run when `installOptionalApps` is true.
 2. Run `chezmoi apply`.
 3. Commit and push.
 
@@ -320,10 +352,14 @@ old unmanaged `~/.wezterm.lua` is ignored and can be deleted.
 ### macOS: Ghostty
 
 Homebrew installs the `ghostty` cask, and `dot_config/ghostty/config` is applied
-to `~/.config/ghostty/config`. It selects JetBrainsMono Nerd Font, Catppuccin
-Mocha, fish shell integration and the macOS transparent titlebar. Reload from
-inside Ghostty with Cmd+Shift+Comma; `ghostty +list-themes` and
-`ghostty +list-fonts` show the names available on the machine.
+to `~/.config/ghostty/config`. Its text area is kept close to the WezTerm look:
+JetBrainsMono Nerd Font Medium at 12 pt, slightly taller cells, Catppuccin
+Mocha, 92% opacity with a blurred background and matching text padding. Window
+chrome, initial window size and macOS window behavior are left to Ghostty
+instead of imitating WezTerm's Windows-oriented decoration. It also uses fish
+shell integration. Reload from inside Ghostty with Cmd+Shift+Comma;
+`ghostty +list-themes` and `ghostty +list-fonts` show the names available on the
+machine.
 
 ## Windows notes
 
@@ -472,6 +508,9 @@ chezmoi verify
   server, make sure sudo is configured for your user.
 - **A winget package in the list fails** — IDs occasionally change. Run
   `winget search <name>`, update the list, and rerun `chezmoi apply`.
+- **Optional apps did not install** — check that `installOptionalApps = true`
+  is under `[data]` in `~/.config/chezmoi/chezmoi.toml`; the
+  `50-optional-apps` scripts render empty and are skipped when it is false.
 - **fish is not the default shell after WSL setup** — close the terminal and
   reopen it. WSL reads the login shell from `/etc/passwd`, which `chsh`
   updates.

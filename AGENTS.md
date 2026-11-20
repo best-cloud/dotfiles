@@ -52,6 +52,15 @@ agents otherwise get wrong.
   winget IDs (`...install-packages.ps1.tmpl`). Tools apt may not package need a
   `case` fallback in the linux branch. Podman is the deliberate exception: it
   is installed on Ubuntu and macOS only, not on Windows.
+- Desktop-only extras are intentional: WeChat DevTools and Postman are
+  development tools installed on macOS (`postman`, `wechatwebdevtools` casks)
+  and Windows (`Postman.Postman`, `Tencent.WeixinDevTools`), not on Linux. The
+  opt-in `installOptionalApps` lists in `run_onchange_after_50-optional-apps.*`
+  are Windows/macOS only and must stay optional and disjoint from the mandatory
+  lists: do not move them into the mandatory lists, duplicate them across both
+  stages, or add an apt branch. Their templates read the flag with
+  `(get . "installOptionalApps")`, so configs created before the key existed
+  still render as disabled.
 - Node.js is the deliberate exception: it is never installed by apt or Homebrew.
   The Linux branch installs fnm with its upstream installer
   (`--skip-shell --install-dir ~/.local/share/fnm`) and the macOS branch installs

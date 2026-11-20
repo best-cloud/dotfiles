@@ -1,0 +1,48 @@
+{{ if and (eq .chezmoi.os "windows") (get . "installOptionalApps") -}}
+# Install optional daily-use applications on Windows 11 with winget.
+# Opt in with `installOptionalApps = true` under [data] in
+# %USERPROFILE%\.config\chezmoi\chezmoi.toml, then run `chezmoi apply`.
+# Keep this list disjoint from run_onchange_before_10-install-packages.ps1.tmpl;
+# optional apps must not repeat the mandatory development tools.
+$ErrorActionPreference = 'Continue'
+
+if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    Write-Warning 'winget was not found; install App Installer from the Microsoft Store and re-run chezmoi apply.'
+    exit 0
+}
+
+$packages = @(
+    'AgileBits.1Password'
+    'Flow-Launcher.Flow-Launcher'
+    'Google.Chrome.EXE'
+    'Notion.Notion'
+    'ONLYOFFICE.DesktopEditors'
+    'Daum.PotPlayer'
+    'SumatraPDF.SumatraPDF'
+    'Tencent.WeChat.Universal'
+    'NetEase.CloudMusic'
+)
+
+$failed = @()
+foreach ($id in $packages) {
+    winget list --id $id --exact --accept-source-agreements *> $null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "already installed: $id"
+        continue
+    }
+
+    Write-Host "installing: $id"
+    winget install --id $id --exact --source winget `
+        --accept-package-agreements --accept-source-agreements `
+        --silent --disable-interactivity
+    if ($LASTEXITCODE -ne 0) {
+        $failed += $id
+    }
+}
+
+if ($failed.Count -gt 0) {
+    Write-Warning "Some optional winget packages failed: $($failed -join ', ')"
+}
+
+Write-Host 'Windows optional applications complete.'
+{{ end -}}

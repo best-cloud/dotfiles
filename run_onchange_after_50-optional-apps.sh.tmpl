@@ -1,0 +1,42 @@
+{{ if and (eq .chezmoi.os "darwin") (get . "installOptionalApps") -}}
+#!/bin/sh
+# Install optional daily-use applications on macOS with Homebrew.
+# Opt in with `installOptionalApps = true` under [data] in
+# ~/.config/chezmoi/chezmoi.toml, then run `chezmoi apply`.
+# Keep these casks disjoint from BREW_PACKAGES/BREW_CASKS in
+# run_onchange_before_10-install-packages.sh.tmpl; optional apps must not repeat
+# the mandatory development tools.
+set -eu
+
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+if ! command -v brew >/dev/null 2>&1; then
+    echo "warning: Homebrew is unavailable; skipping optional applications" >&2
+    exit 0
+fi
+
+BREW_CASKS="
+1password
+google-chrome
+notion
+onlyoffice
+iina
+wechat
+neteasemusic
+"
+
+missing=""
+for cask in $BREW_CASKS; do
+    if ! brew list --cask "$cask" >/dev/null 2>&1; then
+        missing="$missing $cask"
+    fi
+done
+
+if [ -n "$missing" ]; then
+    echo "==> brew install --cask:$missing"
+    # shellcheck disable=SC2086  # word splitting of the cask list is intended
+    brew install --cask $missing
+fi
+
+echo "==> macOS optional applications complete"
+{{ end -}}
