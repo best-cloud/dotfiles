@@ -509,6 +509,10 @@ chezmoi verify
   server, make sure sudo is configured for your user.
 - **A winget package in the list fails** — IDs occasionally change. Run
   `winget search <name>`, update the list, and rerun `chezmoi apply`.
+- **winget prints `Unrecognized command: '...\winget.exe'` on a fresh
+  Windows machine** — a known winget race when commands run back-to-back. The
+  scripts retry automatically; if it still fails, run `winget source update`
+  and rerun `chezmoi apply`.
 - **Optional apps did not install** — check that `installOptionalApps = true`
   is under `[data]` in `~/.config/chezmoi/chezmoi.toml`; the
   `50-optional-apps` scripts render empty and are skipped when it is false.

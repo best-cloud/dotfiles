@@ -142,6 +142,11 @@ agents otherwise get wrong.
   elevated shell; the script warns instead of failing when it is not elevated.
 - The Nerd Font winget package is a machine-scope MSI and needs elevation;
   winget CLI shims live in `%LOCALAPPDATA%\Microsoft\WinGet\Links`.
+- Windows winget calls in `bootstrap.ps1` and the install scripts go through the
+  `Test-WingetPackage` / `Install-WingetPackage` retry helpers. Fresh Windows can
+  intermittently return `Unrecognized command: '...\winget.exe'` when winget
+  commands run back-to-back (winget-cli#5376); keep the retry instead of calling
+  winget directly.
 - If `Documents` is redirected to OneDrive, both profile targets miss. Check
   `[Environment]::GetFolderPath('MyDocuments')` before assuming.
 

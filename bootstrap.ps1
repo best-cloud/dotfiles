@@ -20,6 +20,27 @@ function Update-SessionPath {
     $env:Path = "$machine;$user"
 }
 
+# winget can intermittently fail with "Unrecognized command:
+# '...\winget.exe'" when commands are called back-to-back on a fresh Windows
+# install. The next attempt normally succeeds (winget-cli#5376).
+function Install-WingetPackage {
+    param([string]$Id)
+
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        winget install --id $Id --exact --source winget `
+            --accept-package-agreements --accept-source-agreements `
+            --silent --disable-interactivity
+        if ($LASTEXITCODE -eq 0) {
+            return $true
+        }
+        if ($attempt -lt 3) {
+            Write-Warning "winget install $Id failed (exit $LASTEXITCODE); retrying in 3 seconds..."
+            Start-Sleep -Seconds 3
+        }
+    }
+    return $false
+}
+
 if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
     throw 'winget is required. Install "App Installer" from the Microsoft Store and re-run.'
 }
@@ -28,9 +49,7 @@ if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
 # only after the clone. A fresh Windows 11 has no Git, so install it first.
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Write-Host '==> installing Git'
-    winget install --id Git.Git --exact --source winget `
-        --accept-package-agreements --accept-source-agreements `
-        --silent --disable-interactivity
+    $null = Install-WingetPackage 'Git.Git'
     Update-SessionPath
     $gitCmd = Join-Path $env:ProgramFiles 'Git\cmd'
     if (Test-Path $gitCmd) {
@@ -44,9 +63,7 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 
 if (-not (Get-Command chezmoi -ErrorAction SilentlyContinue)) {
     Write-Host '==> installing chezmoi'
-    winget install --id twpayne.chezmoi --exact --source winget `
-        --accept-package-agreements --accept-source-agreements `
-        --silent --disable-interactivity
+    $null = Install-WingetPackage 'twpayne.chezmoi'
     Update-SessionPath
     $wingetLinks = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'
     if (Test-Path $wingetLinks) {
