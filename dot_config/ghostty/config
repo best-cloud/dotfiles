@@ -35,7 +35,12 @@ scrollback-limit = 100000000
 # fish is the login shell managed by chezmoi.
 shell-integration = fish
 shell-integration-features = no-cursor
-cursor-style = bar
-cursor-style-blink = false
+
+# macOS: only the left Option key acts as Alt, so the right one keeps typing
+# symbols. Alt+Left/Right are unbound so the shell receives them for
+# word-wise movement instead of Ghostty handling them.
+macos-option-as-alt = left
+keybind = alt+left=unbind
+keybind = alt+right=unbind
 
 keybind = cmd+enter=toggle_fullscreen

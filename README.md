@@ -384,9 +384,10 @@ JetBrainsMono Nerd Font Medium at 12 pt, slightly taller cells, Catppuccin
 Mocha, 92% opacity with a blurred background and matching text padding. Window
 chrome, initial window size and macOS window behavior are left to Ghostty
 instead of imitating WezTerm's Windows-oriented decoration. It also uses fish
-shell integration. Reload from inside Ghostty with Cmd+Shift+Comma;
-`ghostty +list-themes` and `ghostty +list-fonts` show the names available on the
-machine.
+shell integration. Only the left Option key acts as Alt, and Alt+Left/Right are
+unbound so the shell gets them for word-wise movement. Reload from inside
+Ghostty with Cmd+Shift+Comma; `ghostty +list-themes` and `ghostty +list-fonts`
+show the names available on the machine.
 
 ## Windows notes
 
