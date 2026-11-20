@@ -9,6 +9,9 @@ if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
 }
 
 # Keep this list in sync with the apt/Homebrew lists in the .sh script.
+# mosh is the deliberate exception: it has no native Windows build or winget
+# package, so it is installed inside the WSL2 Ubuntu distribution by the Linux
+# branch of the .sh script. From Windows, run it with `wsl mosh ...`.
 $packages = @(
     'Microsoft.PowerShell'
     'Git.Git'
@@ -33,6 +36,7 @@ $packages = @(
     'Zellij.Zellij'
     'JesseDuffield.lazygit'
     'Anomaly.OpenCode'
+    'Ollama.Ollama'
     'OpenJS.NodeJS.LTS'
     'mvdan.shfmt'
     'DEVCOM.JetBrainsMonoNerdFont'

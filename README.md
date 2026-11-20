@@ -64,6 +64,15 @@ in the default source (`~/.local/share/chezmoi`), which does not exist.
 `bootstrap.sh` asks for your sudo password once up front so the apt phase does
 not stop halfway through.
 
+On WSL2, `bootstrap.sh` also enables systemd by merging `systemd=true` into the
+`[boot]` section of `/etc/wsl.conf`; the rest of the file (`[automount]`,
+`[interop]`, `[user]`, …) is preserved and the edit is skipped when it is already
+correct. WSL reads this file only when the distribution starts, so run
+`wsl --shutdown` from Windows and reopen Ubuntu afterwards. If Ollama was
+installed during the same bootstrap, enable its service after the restart with
+`sudo systemctl enable --now ollama` (the installer writes the unit but cannot
+enable it while systemd is not running).
+
 ### Repository URL
 
 The bootstraps use `https://github.com/best-cloud/dotfiles.git`. If you fork
@@ -82,10 +91,10 @@ GitHub (SSH key or `gh auth login`), or pass an SSH URL through
 | Core CLI | git, curl, wget, build-essential, unzip, zip | git, wget | Git |
 | Modern CLI | ripgrep, fd-find, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq |
 | Editors / multiplexers | neovim, emacs, zellij | neovim, emacs, zellij | Neovim, Emacs, Zellij |
-| Dev tools | gh, direnv, uv, lazygit | gh, direnv, uv, lazygit, WeChat DevTools, Postman | gh, uv, lazygit, WeChat DevTools, Postman |
+| Dev tools | gh, direnv, uv, lazygit, mosh | gh, direnv, uv, lazygit, mosh, WeChat DevTools, Postman | gh, uv, lazygit, WeChat DevTools, Postman (mosh via WSL) |
 | Containers | podman | podman | — |
 | Node.js | fnm + Node.js LTS (no apt) | fnm + Node.js LTS (no Homebrew) | Node.js LTS (winget) |
-| AI / Python tooling | opencode, ruff | opencode, ruff | OpenCode, Ruff |
+| AI / Python tooling | opencode, ruff, ollama | opencode, ruff, ollama | OpenCode, Ruff, Ollama |
 | Formatters | prettier, shfmt | prettier, shfmt | Prettier, shfmt |
 | Optional daily-use apps | — | see below | see below |
 | Terminal | — (client terminal) | Ghostty | Windows Terminal, WezTerm |
@@ -110,6 +119,18 @@ installer and puts the launcher in `~/.opencode/bin`, which fish already adds to
 `PATH`. macOS installs it from the upstream Homebrew tap
 (`anomalyco/tap/opencode-v2`), and Windows installs the official portable
 `Anomaly.OpenCode` winget package.
+
+Ubuntu packages `mosh` but not `ollama` (it ships only the `python3-ollama`
+client library), so the Linux script installs Ollama with the upstream installer
+at <https://ollama.com/install.sh>. That installer needs root, so it runs through
+`sudo` when the script is not already root. In WSL without systemd the binary is
+still installed; start the server with `ollama serve`. macOS gets both from
+Homebrew (`mosh` and `ollama` formulae), and Windows installs `Ollama.Ollama`
+from winget.
+
+mosh is installed on both Ubuntu Server and WSL (the same apt package), and on
+macOS. It has no native Windows build or winget package, so on Windows it is
+available through the WSL2 Ubuntu distribution; run it as `wsl mosh <host>`.
 
 Ubuntu 26.04 packages Starship 1.22.1, but the shipped
 `catppuccin-powerline` preset uses `jj_bookmark`, added in Starship 1.27.0.
@@ -150,12 +171,17 @@ and defaults to no, and the answer is stored as `installOptionalApps` in
 `~/.config/chezmoi/chezmoi.toml`. At the prompt, enter `y` (or `yes`/`true`) to
 install the list, or `n` (or `no`/`false`, or just Enter) to skip it.
 
-- macOS (Homebrew casks): `1password`, `google-chrome`, `notion`,
-  `onlyoffice`, `iina`, `wechat`, `neteasemusic`.
+- macOS (Homebrew casks): `1password`, `google-chrome`, `flclash`, `notion`,
+  `onlyoffice`, `iina`, `wechat`, `neteasemusic`, `openvpn-connect`,
+  `windows-app`.
 - Windows (winget): `AgileBits.1Password`, `Flow-Launcher.Flow-Launcher`,
-  `Google.Chrome.EXE`, `Notion.Notion`, `ONLYOFFICE.DesktopEditors`,
-  `Daum.PotPlayer`, `SumatraPDF.SumatraPDF`, `Tencent.WeChat.Universal`,
-  `NetEase.CloudMusic`.
+  `Google.Chrome.EXE`, `chen08209.FlClash`, `Notion.Notion`,
+  `ONLYOFFICE.DesktopEditors`, `Daum.PotPlayer`, `SumatraPDF.SumatraPDF`,
+  `Tencent.WeChat.Universal`, `NetEase.CloudMusic`.
+
+The macOS `flclash` cask is published in the `chen08209/tap` tap rather than
+homebrew-cask, so the optional script taps it and installs it separately from
+the other casks.
 
 The optional lists are deliberately disjoint from the mandatory package lists:
 do not add a package to both stages. The main install scripts own development

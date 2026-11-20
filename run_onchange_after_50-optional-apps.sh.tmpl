@@ -23,6 +23,8 @@ onlyoffice
 iina
 wechat
 neteasemusic
+openvpn-connect
+windows-app
 "
 
 missing=""
@@ -36,6 +38,17 @@ if [ -n "$missing" ]; then
     echo "==> brew install --cask:$missing"
     # shellcheck disable=SC2086  # word splitting of the cask list is intended
     brew install --cask $missing
+fi
+
+# FlClash is published in the chen08209/tap tap rather than homebrew-cask, so
+# it is installed separately: a tap failure must not block the casks above.
+if ! brew list --cask flclash >/dev/null 2>&1; then
+    echo "==> brew tap chen08209/tap && brew install --cask flclash"
+    if brew tap chen08209/tap && brew install --cask flclash; then
+        :
+    else
+        echo "warning: FlClash installation failed" >&2
+    fi
 fi
 
 echo "==> macOS optional applications complete"

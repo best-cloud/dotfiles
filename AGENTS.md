@@ -51,7 +51,11 @@ agents otherwise get wrong.
   `...install-packages.sh.tmpl`), Homebrew formulas/casks (darwin branch), and
   winget IDs (`...install-packages.ps1.tmpl`). Tools apt may not package need a
   `case` fallback in the linux branch. Podman is the deliberate exception: it
-  is installed on Ubuntu and macOS only, not on Windows.
+  is installed on Ubuntu and macOS only, not on Windows. mosh is the other
+  exception: there is no native Windows build or winget package, so the Linux
+  branch installs it in both Ubuntu Server and WSL2 Ubuntu. ollama is
+  not packaged by apt (only the `python3-ollama` client library), so the Linux
+  branch installs it with the upstream `https://ollama.com/install.sh` script.
 - Desktop-only extras are intentional: WeChat DevTools and Postman are
   development tools installed on macOS (`postman`, `wechatwebdevtools` casks)
   and Windows (`Postman.Postman`, `Tencent.WeixinDevTools`), not on Linux. The
@@ -140,6 +144,11 @@ agents otherwise get wrong.
   `wsl --install --distribution Ubuntu --no-launch`, not by a winget distro
   package, so it always tracks the current LTS. The first enablement needs an
   elevated shell; the script warns instead of failing when it is not elevated.
+- On WSL, `bootstrap.sh` idempotently merges `systemd=true` into a `[boot]`
+  section of `/etc/wsl.conf` (detected via `/proc/version`) and never overwrites
+  the rest of the file. WSL only reads it at distro start, so the restart with
+  `wsl --shutdown` is required; the bootstrap itself still runs without systemd.
+  Ollama's installer writes the unit but cannot enable it until that restart.
 - The Nerd Font winget package is a machine-scope MSI and needs elevation;
   winget CLI shims live in `%LOCALAPPDATA%\Microsoft\WinGet\Links`.
 - Windows winget calls in `bootstrap.ps1` and the install scripts go through the

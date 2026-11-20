@@ -54,6 +54,7 @@ tree
 htop
 btop
 tmux
+mosh
 neovim
 emacs
 direnv
@@ -64,6 +65,7 @@ zellij
 podman
 uv
 ruff
+ollama
 opencode
 fnm
 prettier
@@ -154,6 +156,22 @@ for pkg in $unavailable; do
         else
             echo "warning: ruff needs uv or a manual install" >&2
         fi
+        ;;
+    ollama)
+        # Ubuntu ships only the python3-ollama client library, so use the
+        # upstream installer. It needs root, installs the ollama binary and,
+        # when systemd is available, enables the service; in WSL without
+        # systemd the binary is still installed and `ollama serve` works.
+        has ollama && continue
+        echo "==> installing ollama (not packaged by apt)"
+        tmpfile=$(mktemp)
+        if curl -fsSL https://ollama.com/install.sh -o "$tmpfile"; then
+            $SUDO sh "$tmpfile" ||
+                echo "warning: ollama installation failed" >&2
+        else
+            echo "warning: ollama download failed" >&2
+        fi
+        rm -f "$tmpfile"
         ;;
     opencode)
         has opencode && continue
@@ -276,6 +294,7 @@ tree
 htop
 btop
 tmux
+mosh
 zellij
 neovim
 emacs
@@ -285,6 +304,7 @@ lazygit
 podman
 uv
 ruff
+ollama
 fnm
 shfmt
 diffutils

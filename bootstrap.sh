@@ -40,6 +40,75 @@ fi
 PATH="$HOME/.local/bin:$PATH"
 export PATH
 
+# WSL only: enable systemd in /etc/wsl.conf. The Ollama installer and other
+# services expect a service manager. Merge the [boot] section instead of
+# replacing the file, so [automount], [interop], [user] and other settings
+# survive. systemd starts only after `wsl --shutdown` on Windows and a new
+# session, so the rest of this bootstrap still runs without it.
+if [ -r /proc/version ] && grep -qi microsoft /proc/version; then
+    WSL_SUDO=""
+    if [ "$(id -u)" -ne 0 ]; then
+        if command -v sudo >/dev/null 2>&1; then
+            WSL_SUDO=sudo
+        else
+            echo "warning: sudo is required to enable systemd in /etc/wsl.conf; skipping" >&2
+        fi
+    fi
+    if [ "$(id -u)" -eq 0 ] || [ -n "$WSL_SUDO" ]; then
+        conf=/etc/wsl.conf
+        new=$(mktemp)
+        if [ -f "$conf" ]; then
+            awk '
+            function flush_boot() {
+                if (in_boot && !boot_written) {
+                    print "systemd=true"
+                    boot_written = 1
+                }
+            }
+            /^[[:space:]]*\[/ {
+                flush_boot()
+                header = $0
+                gsub(/\r/, "", header)
+                sub(/[[:space:]]*#.*$/, "", header)
+                sub(/^[[:space:]]+/, "", header)
+                sub(/[[:space:]]+$/, "", header)
+                in_boot = (header == "[boot]")
+                if (in_boot) boot_seen = 1
+                print
+                next
+            }
+            in_boot && /^[[:space:]]*systemd[[:space:]]*=/ {
+                if (!boot_written) {
+                    print "systemd=true"
+                    boot_written = 1
+                }
+                next
+            }
+            { print }
+            END {
+                flush_boot()
+                if (!boot_seen) {
+                    print ""
+                    print "[boot]"
+                    print "systemd=true"
+                }
+            }' "$conf" >"$new"
+        else
+            printf '[boot]\nsystemd=true\n' >"$new"
+        fi
+        if [ -f "$conf" ] && [ "$(cat "$new")" = "$(cat "$conf")" ]; then
+            rm -f "$new"
+        else
+            if [ -f "$conf" ] && [ ! -f "$conf.orig" ]; then
+                $WSL_SUDO cp -a "$conf" "$conf.orig"
+            fi
+            $WSL_SUDO install -m 0644 "$new" "$conf"
+            rm -f "$new"
+            echo "==> enabled systemd in /etc/wsl.conf (run 'wsl --shutdown' on Windows to apply)"
+        fi
+    fi
+fi
+
 # Point apt at the Tsinghua TUNA mirror before installing prerequisites, so the
 # whole bootstrap is fast. Ubuntu 24.04+ (including the current LTS) uses the
 # deb822 format. Keep this in sync with
