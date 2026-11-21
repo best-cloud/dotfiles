@@ -12,6 +12,16 @@
 # Keep the bootstrap.sh copy of this logic in sync when changing it.
 set -eu
 
+# WSL appends the Windows PATH, so ignore /mnt shims (gsudo.exe) and require
+# the native sudo.
+native_cmd() {
+    _p=$(command -v "$1" 2>/dev/null) || return 1
+    case "$_p" in
+    /mnt/* | *.exe) return 1 ;;
+    esac
+    return 0
+}
+
 [ -r /etc/os-release ] || exit 0
 # shellcheck disable=SC1091
 . /etc/os-release
@@ -34,7 +44,7 @@ fi
 
 SUDO=""
 if [ "$(id -u)" -ne 0 ]; then
-    if command -v sudo >/dev/null 2>&1; then
+    if native_cmd sudo; then
         SUDO=sudo
     else
         echo "warning: sudo is required to update apt sources; skipping" >&2

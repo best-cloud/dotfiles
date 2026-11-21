@@ -14,6 +14,17 @@ REPO="${CHEZMOI_REPO:-https://github.com/best-cloud/dotfiles.git}"
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd || pwd)
 
+# WSL appends the Windows PATH, so a bare `command -v` can resolve a Windows
+# shim under /mnt (for example curl.exe or gsudo.exe). Those are slow when
+# launched from Linux and use Windows paths, so only count native executables.
+native_cmd() {
+    _p=$(command -v "$1" 2>/dev/null) || return 1
+    case "$_p" in
+    /mnt/* | *.exe) return 1 ;;
+    esac
+    return 0
+}
+
 # An explicit CHEZMOI_REPO wins; otherwise use the local checkout if there is
 # one, and finally fall back to the repository URL.
 if [ -z "${CHEZMOI_REPO:-}" ] && [ -f "$SCRIPT_DIR/.chezmoi.toml.tmpl" ]; then
@@ -25,7 +36,7 @@ else
 fi
 
 fetch() {
-    if command -v curl >/dev/null 2>&1; then
+    if native_cmd curl; then
         curl -fsSL "$1"
     else
         wget -qO- "$1"
@@ -33,7 +44,7 @@ fetch() {
 }
 
 # Cache sudo credentials up front so the package script does not stop halfway.
-if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
+if [ "$(id -u)" -ne 0 ] && native_cmd sudo; then
     sudo -v || true
 fi
 
@@ -48,7 +59,7 @@ export PATH
 if [ -r /proc/version ] && grep -qi microsoft /proc/version; then
     WSL_SUDO=""
     if [ "$(id -u)" -ne 0 ]; then
-        if command -v sudo >/dev/null 2>&1; then
+        if native_cmd sudo; then
             WSL_SUDO=sudo
         else
             echo "warning: sudo is required to enable systemd in /etc/wsl.conf; skipping" >&2
@@ -124,7 +135,7 @@ if [ -r /etc/os-release ] && command -v apt-get >/dev/null 2>&1; then
         esac
         codename="${VERSION_CODENAME:-${UBUNTU_CODENAME:-}}"
         if [ -n "$mirror" ] && [ -n "$codename" ] &&
-            { [ "$(id -u)" -eq 0 ] || command -v sudo >/dev/null 2>&1; }; then
+            { [ "$(id -u)" -eq 0 ] || native_cmd sudo; }; then
             MIRROR_SUDO=""
             if [ "$(id -u)" -ne 0 ]; then
                 MIRROR_SUDO=sudo
@@ -163,13 +174,13 @@ fi
 # `chezmoi init <repo>` clones with git, and the one-line bootstrap needs an
 # HTTP client before anything is installed. Fresh Ubuntu Server and WSL images
 # do not always ship git, so install the bootstrap prerequisites first.
-if ! command -v git >/dev/null 2>&1 ||
-    { ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; }; then
+if ! native_cmd git ||
+    { ! native_cmd curl && ! native_cmd wget; }; then
     if command -v apt-get >/dev/null 2>&1; then
         echo "==> installing bootstrap prerequisites (git, curl)"
         SUDO=""
         if [ "$(id -u)" -ne 0 ]; then
-            if command -v sudo >/dev/null 2>&1; then
+            if native_cmd sudo; then
                 SUDO=sudo
             else
                 echo "error: sudo is required to install git" >&2
@@ -182,7 +193,7 @@ if ! command -v git >/dev/null 2>&1 ||
     fi
 fi
 
-if ! command -v git >/dev/null 2>&1 && [ "$LOCAL" -eq 0 ]; then
+if ! native_cmd git && [ "$LOCAL" -eq 0 ]; then
     if [ "$(uname -s)" = "Darwin" ]; then
         echo "error: git is required. Install the Xcode Command Line Tools with" >&2
         echo "       'xcode-select --install' and re-run this script." >&2
@@ -192,16 +203,16 @@ if ! command -v git >/dev/null 2>&1 && [ "$LOCAL" -eq 0 ]; then
     exit 1
 fi
 
-if ! command -v chezmoi >/dev/null 2>&1; then
+if ! native_cmd chezmoi; then
     echo "==> installing chezmoi"
-    if [ "$(uname -s)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
+    if [ "$(uname -s)" = "Darwin" ] && native_cmd brew; then
         brew install chezmoi
     else
         fetch https://get.chezmoi.io | sh -s -- -b "$HOME/.local/bin"
     fi
 fi
 
-if ! command -v chezmoi >/dev/null 2>&1; then
+if ! native_cmd chezmoi; then
     echo "error: chezmoi installation failed; install it manually and re-run." >&2
     exit 1
 fi

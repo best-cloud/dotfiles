@@ -168,6 +168,14 @@ agents otherwise get wrong.
   the rest of the file. WSL only reads it at distro start, so the restart with
   `wsl --shutdown` is required; the bootstrap itself still runs without systemd.
   Ollama's installer writes the unit but cannot enable it until that restart.
+- WSL appends the Windows `PATH`, which includes `/mnt/c/...`. Never use a bare
+  `command -v` to decide whether a Linux tool is installed: when the native
+  binary is missing, the probe falls through to a Windows shim (the Windows npm
+  `prettier` used to suppress the native install). Those shims are slow from
+  Linux and mishandle Linux paths, and passing a `/mnt` `fish.exe` to `chsh` or
+  `gsudo.exe` to `sudo` is wrong. The Unix scripts use a native-only
+  `has`/`native_cmd` helper that rejects `/mnt/*` and `*.exe`; apply the same
+  guard to any new install or privilege probe.
 - The Nerd Font winget package is a machine-scope MSI and needs elevation;
   winget CLI shims live in `%LOCALAPPDATA%\Microsoft\WinGet\Links`.
 - The GNU Emacs installer does not add its versioned

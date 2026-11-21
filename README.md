@@ -163,6 +163,12 @@ formula, because that formula depends on Homebrew's Node.js. Installing it into
 `~/.local` keeps `prettier` on `PATH` regardless of which fnm version is active.
 `shfmt` comes from apt, Homebrew and winget.
 
+WSL appends the Windows `PATH`, so the install probes ignore non-native
+executables (paths under `/mnt` or ending in `.exe`). Otherwise an inherited
+Windows npm `prettier` would make the Linux script think the tool was already
+installed and skip the native one, and every later `prettier` call would run a
+Windows shim.
+
 ### Optional daily-use apps
 
 Windows and macOS can also install a personal set of daily-use applications.
@@ -600,6 +606,11 @@ chezmoi verify
   new shell (`fnm env --use-on-cd` is sourced by fish). If a machine previously
   installed Node.js with apt or Homebrew, remove it (`sudo apt-get remove
   nodejs npm` or `brew uninstall node prettier`) so the fnm version wins.
+- **A command resolves to `/mnt/c/...`** — WSL appends the Windows `PATH`, so
+  `prettier`, `zellij`, `emacs` and similar tools can fall through to a Windows
+  shim when no native binary exists. The install scripts ignore `/mnt` and
+  `*.exe` when probing, so re-run `chezmoi apply` to install the native package
+  instead of invoking the Windows executable.
 - **apt still downloads from archive.ubuntu.com** — the 05 script only runs on
   Ubuntu. Check `/etc/os-release` (`ID=ubuntu`) and run `chezmoi apply`. The
   original source file is preserved as `*.orig`.
