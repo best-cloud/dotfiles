@@ -42,9 +42,13 @@ fi
 
 # FlClash is published in the chen08209/tap tap rather than homebrew-cask, so
 # it is installed separately: a tap failure must not block the casks above.
+# Homebrew 7 refuses to load casks from third-party taps until they are
+# trusted, so trust this specific cask after tapping and before installing.
 if ! brew list --cask flclash >/dev/null 2>&1; then
-    echo "==> brew tap chen08209/tap && brew install --cask flclash"
-    if brew tap chen08209/tap && brew install --cask flclash; then
+    echo "==> brew tap chen08209/tap && brew trust --cask chen08209/tap/flclash"
+    if brew tap chen08209/tap &&
+        brew trust --cask chen08209/tap/flclash &&
+        brew install --cask flclash; then
         :
     else
         echo "warning: FlClash installation failed" >&2

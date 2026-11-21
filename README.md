@@ -181,7 +181,9 @@ install the list, or `n` (or `no`/`false`, or just Enter) to skip it.
 
 The macOS `flclash` cask is published in the `chen08209/tap` tap rather than
 homebrew-cask, so the optional script taps it and installs it separately from
-the other casks.
+the other casks. Homebrew 7 refuses to load casks from third-party taps until
+they are trusted, so the script runs `brew trust --cask chen08209/tap/flclash`
+before the install.
 
 The optional lists are deliberately disjoint from the mandatory package lists:
 do not add a package to both stages. The main install scripts own development
