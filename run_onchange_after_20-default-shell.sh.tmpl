@@ -4,6 +4,13 @@
 # Idempotent, and rendered empty on Windows.
 set -eu
 
+# Homebrew installs fish outside the default PATH, and chezmoi is not
+# necessarily running with `brew shellenv` loaded (a fresh bootstrap is not).
+if [ "$(uname -s)" = "Darwin" ]; then
+    PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+    export PATH
+fi
+
 fish_path=$(command -v fish 2>/dev/null || true)
 if [ -z "$fish_path" ]; then
     echo "fish is not installed yet; leaving the login shell unchanged" >&2
