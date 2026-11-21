@@ -1,0 +1,25 @@
+{{ if eq .chezmoi.os "darwin" -}}
+#!/bin/sh
+# Keep Finder metadata off network shares and removable media.
+#
+# `.DS_Store' files clutter SMB/AFP/NAS shares and FAT/exFAT USB drives, where
+# Windows and Linux users see them. These per-user Desktop Services preferences
+# have no System Settings toggle; Finder reads them at launch. The keys are
+# preventive only: existing files stay until they are removed.
+set -eu
+
+changed=0
+for key in DSDontWriteNetworkStores DSDontWriteUSBStores; do
+    current=$(defaults read com.apple.desktopservices "$key" 2>/dev/null || true)
+    if [ "$current" != "1" ]; then
+        defaults write com.apple.desktopservices "$key" -bool true
+        changed=1
+    fi
+done
+
+if [ "$changed" -eq 1 ]; then
+    echo "==> disabled .DS_Store on network and USB volumes"
+    # Finder caches these preferences; restart it so the change applies now.
+    killall Finder 2>/dev/null || true
+fi
+{{ end -}}

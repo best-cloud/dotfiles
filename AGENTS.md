@@ -127,6 +127,12 @@ agents otherwise get wrong.
   default GUI font
   is JetBrainsMono NF 12 pt medium; the mode-line height uses
   `:separator-scale 1.1`.
+- `run_onchange_after_20-macos-defaults.sh.tmpl` is macOS-only and renders
+  empty elsewhere. It sets `DSDontWriteNetworkStores` and
+  `DSDontWriteUSBStores` in `com.apple.desktopservices` so Finder stops
+  writing `.DS_Store` on NAS shares and USB/removable media, and restarts
+  Finder only when a value changes. The keys are preventive: existing files
+  stay, and command-line copies can still create AppleDouble `._*` files.
 - The deb822 TUNA apt-mirror logic exists twice: in `bootstrap.sh` (so the
   prerequisites are fast) and in `run_onchange_before_05-ubuntu-mirror.sh.tmpl`
   (so `chezmoi apply` enforces it). Keep the two copies in sync. Only

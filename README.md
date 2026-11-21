@@ -249,6 +249,7 @@ production machine needs immediate security updates.
 ├── run_onchange_before_10-install-packages.sh.tmpl    # apt + Homebrew
 ├── run_onchange_before_10-install-packages.ps1.tmpl   # winget
 ├── run_onchange_after_20-default-shell.sh.tmpl        # chsh to fish
+├── run_onchange_after_20-macos-defaults.sh.tmpl       # .DS_Store off NAS/USB
 ├── run_onchange_after_30-spacemacs.sh.tmpl            # clone Spacemacs (Unix)
 ├── run_onchange_after_30-spacemacs.ps1.tmpl           # clone Spacemacs (Windows)
 ├── run_onchange_after_40-wsl.ps1.tmpl                 # WSL2 + Ubuntu
@@ -394,6 +395,25 @@ uses fish shell integration. Only the left Option key acts as Alt, and
 Alt+Left/Right are unbound so the shell gets them for word-wise movement.
 Reload from inside Ghostty with Cmd+Shift+Comma; `ghostty +list-themes` and
 `ghostty +list-fonts` show the names available on the machine.
+
+### macOS: NAS and USB metadata
+
+`run_onchange_after_20-macos-defaults.sh.tmpl` sets the per-user
+`com.apple.desktopservices` keys `DSDontWriteNetworkStores` and
+`DSDontWriteUSBStores`, so Finder stops writing `.DS_Store` files on network
+shares (SMB/AFP/NAS) and removable media (USB drives, SD cards). The script
+restarts Finder only when it changes a value; otherwise it is a no-op.
+
+These settings are preventive: existing `.DS_Store` and AppleDouble `._*` files
+stay until removed. To clean a mounted volume:
+
+```sh
+find /Volumes/<name> \( -name .DS_Store -o -name '._*' \) -delete
+```
+
+AppleDouble `._*` files can still be produced by command-line copies to
+FAT/exFAT media; use `ditto --norsrc --noextattr` or `rsync --exclude='._*'`
+when that matters.
 
 ## Windows notes
 
