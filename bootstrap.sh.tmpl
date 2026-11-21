@@ -1,0 +1,78 @@
+#!/bin/sh
+# One-command bootstrap for Ubuntu Server, WSL2 and macOS.
+#
+# Usage (from a local checkout):
+#   ./bootstrap.sh
+#
+# Usage (fresh machine, one line):
+#   sh -c "$(curl -fsSL https://raw.githubusercontent.com/best-cloud/dotfiles/main/bootstrap.sh)"
+#
+# Set CHEZMOI_REPO to override the repository URL, or change REPO below.
+#
+# Generated from bootstrap.sh.tmpl by scripts/render-bootstrap.sh. Edit the
+# template or scripts/lib/*.sh instead of this file.
+set -eu
+
+{{ include "scripts/lib/shell.sh" }}
+{{ include "scripts/lib/fetch.sh" }}
+{{ include "scripts/lib/ubuntu-mirror.sh" }}
+{{ include "scripts/lib/wsl.sh" }}
+{{ include "scripts/lib/bootstrap.sh" }}
+REPO="${CHEZMOI_REPO:-https://github.com/best-cloud/dotfiles.git}"
+
+# Do not let a caller's CDPATH make `cd` print or pick another directory.
+unset CDPATH
+
+script_dir=$(dirname -- "$0")
+if ! SCRIPT_DIR=$(cd -- "$script_dir" 2>/dev/null && pwd); then
+    SCRIPT_DIR=$(pwd)
+fi
+
+# An explicit CHEZMOI_REPO wins; otherwise use the local checkout if there is
+# one, and finally fall back to the repository URL.
+if [ -z "${CHEZMOI_REPO:-}" ] && [ -f "$SCRIPT_DIR/.chezmoi.toml.tmpl" ]; then
+    SOURCE="$SCRIPT_DIR"
+    LOCAL=1
+else
+    SOURCE="$REPO"
+    LOCAL=0
+fi
+
+# Cache sudo credentials up front so the package script does not stop halfway.
+if [ "$(id -u)" -ne 0 ] && native_cmd sudo; then
+    sudo -v || true
+fi
+
+PATH="$HOME/.local/bin:$PATH"
+export PATH
+
+configure_wsl_systemd
+configure_ubuntu_mirror
+install_bootstrap_prerequisites
+
+if ! native_cmd git && [ "$LOCAL" -eq 0 ]; then
+    if [ "$(uname -s)" = "Darwin" ]; then
+        echo "error: git is required. Install the Xcode Command Line Tools with" >&2
+        echo "       'xcode-select --install' and re-run this script." >&2
+    else
+        echo "error: git is required to clone $REPO; install git and re-run." >&2
+    fi
+    exit 1
+fi
+
+install_chezmoi
+
+if ! native_cmd chezmoi; then
+    echo "error: chezmoi installation failed; install it manually and re-run." >&2
+    exit 1
+fi
+
+echo "==> applying dotfiles from $SOURCE"
+if [ "$LOCAL" -eq 1 ]; then
+    chezmoi init --apply --source "$SOURCE"
+else
+    chezmoi init --apply "$SOURCE"
+fi
+
+echo
+echo "==> done. Start a new shell to use fish, or run: exec fish"

@@ -1,9 +1,10 @@
 # AGENTS.md
 
-chezmoi dotfiles for Ubuntu/WSL2, macOS and Windows 11. There is no build, test
-suite, lint or CI: correctness means templates render and chezmoi is in sync.
-README.md documents the design and per-OS behavior; this file only records what
-agents otherwise get wrong.
+chezmoi dotfiles for Ubuntu/WSL2, macOS and Windows 11. Correctness means
+templates render, the static checks pass and chezmoi is in sync. `scripts/check.sh`
+renders the templates and runs the available linters; `.github/workflows/ci.yml`
+runs it on Linux and macOS. README.md documents the design and per-OS behavior;
+this file only records what agents otherwise get wrong.
 
 ## Verify before claiming a change works
 
@@ -25,6 +26,10 @@ agents otherwise get wrong.
   `--promptDefaults` for non-interactive runs or they hang.
 - Test without touching the real home using the scratch `--source`,
   `--destination` and `--config` commands in README "Testing changes safely".
+- Run `sh scripts/check.sh` after editing scripts or templates. It renders every
+  template into a temporary tree, then runs `sh -n`, `shellcheck`, `shfmt`,
+  `fish -n`, the PowerShell parser, JSON/TOML/Lua checks and `actionlint` when
+  those tools are installed.
 
 ## chezmoi rules that are easy to get wrong
 
@@ -34,13 +39,19 @@ agents otherwise get wrong.
   templates, and `.chezmoiignore` patterns match **target** paths.
 - Every source file is a managed target unless listed in `.chezmoiignore`. New
   root docs must be added there or they get copied into `$HOME` (README.md and
-  AGENTS.md are ignored this way).
+  AGENTS.md are ignored this way). Repo-only tooling (`.editorconfig`,
+  `.gitattributes`, `.shellcheckrc`, `.github/**`, `scripts/**`, and the
+  `bootstrap.*.tmpl` sources) is ignored for the same reason.
 - Scripts run in lexical order (`10-`, `20-` prefixes); `before_`/`after_` choose
   the apply phase.
 - Any rendered byte change in a `run_onchange_` script (even a comment) makes
   chezmoi re-run it on the next apply. Don't edit them casually on a live box.
 - Adding software means editing the `run_onchange_` install scripts, not
   `bootstrap.*`; bootstrap only installs chezmoi and calls `chezmoi init`.
+- `bootstrap.sh` and `bootstrap.ps1` are generated from `bootstrap.*.tmpl` by
+  `scripts/render-bootstrap.sh` so they stay standalone while sharing helpers
+  from `scripts/lib/`. Edit the templates or libraries, run the renderer, and
+  commit both generated files; `scripts/check.sh` fails when they are stale.
 
 ## Non-negotiable cross-OS invariants
 
@@ -61,6 +72,9 @@ agents otherwise get wrong.
   over the system BSD tar, which adds AppleDouble `._*` members that break
   Emacs' `package-tar-file-info` when building the code-review package; Linux
   already ships GNU tar and Windows gets it from Git for Windows.
+  `bsdextrautils` is the Linux-only exception: it provides `col`, which the
+  managed fish `MANPAGER` pipeline uses. macOS ships `col` with the base system
+  and fish is not managed on Windows, so it has no Homebrew or winget entry.
 - Desktop-only extras are intentional: WeChat DevTools and Postman are
   development tools installed on macOS (`postman`, `wechatwebdevtools` casks)
   and Windows (`Postman.Postman`, `Tencent.WeixinDevTools`), not on Linux. The
@@ -85,8 +99,9 @@ agents otherwise get wrong.
   uses `Anomaly.OpenCode`. Ruff is in all three lists (apt falls back to
   `uv tool install ruff`).
 - Prettier is installed through npm on Linux, macOS and Windows (on Unix it
-  runs after fnm has put Node.js on `PATH`, into `~/.local`). shfmt is in all
-  three lists. Spacemacs uses neither: only the python layer formats on save
+  runs after fnm has put Node.js on `PATH`, into `~/.local`). shfmt and
+  shellcheck are in all three lists. Spacemacs uses none of them: only the
+  python layer formats on save
   (`python-formatter 'ruff`, `python-format-on-save t`). Do not re-add a
   prettier-js hook, the web/config `*-fmt-on-save` variables or
   `shell-scripts-format-on-save`; the other language layers are editing,
@@ -133,9 +148,9 @@ agents otherwise get wrong.
   writing `.DS_Store` on NAS shares and USB/removable media, and restarts
   Finder only when a value changes. The keys are preventive: existing files
   stay, and command-line copies can still create AppleDouble `._*` files.
-- The deb822 TUNA apt-mirror logic exists twice: in `bootstrap.sh` (so the
-  prerequisites are fast) and in `run_onchange_before_05-ubuntu-mirror.sh.tmpl`
-  (so `chezmoi apply` enforces it). Keep the two copies in sync. Only
+- The deb822 TUNA apt-mirror logic lives in `scripts/lib/ubuntu-mirror.sh`. The
+  `05-ubuntu-mirror` script includes it, and the generated `bootstrap.sh`
+  inlines it so prerequisites are fast before chezmoi exists. Only
   `/etc/apt/sources.list.d/ubuntu.sources` is written; the repo targets the
   current Ubuntu LTS, so there is no legacy `sources.list` branch.
 - Prefer template data (`.name`, `.email`, `.editor`, `.isWSL`, `.isMacOS`,
@@ -143,9 +158,9 @@ agents otherwise get wrong.
 
 ## Windows specifics
 
-- Profiles: `Documents/PowerShell/Microsoft.PowerShell_profile.ps1` (PS7) plus
-  the 7-line `Documents/WindowsPowerShell/...` shim for 5.1. Add logic only to
-  the PS7 file.
+- Profiles: `Documents/PowerShell/Microsoft.PowerShell_profile.ps1.tmpl` (PS7)
+  plus the 7-line `Documents/WindowsPowerShell/...` shim for 5.1. The template
+  includes `scripts/lib/path.ps1`; add logic only to the PS7 template.
 - The profile sets `XDG_*` and `ZELLIJ_CONFIG_DIR` so Neovim, Starship, Zellij
   and WezTerm read `~/.config`. Removing them silently breaks all four. It also
   sets `SHELL` (`pwsh` on 7, `powershell` on 5.1) so Zellij panes do not fall
@@ -183,12 +198,14 @@ agents otherwise get wrong.
   resolves the newest install and prepends it. Keep the version discovery;
   do not pin a version that breaks on the next Emacs upgrade.
 - Windows winget calls in `bootstrap.ps1` and the install scripts go through the
-  `Test-WingetPackage` / `Install-WingetPackage` retry helpers. Fresh Windows can
-  intermittently return `Unrecognized command: '...\winget.exe'` when winget
-  commands run back-to-back (winget-cli#5376); keep the retry instead of calling
-  winget directly.
-- If `Documents` is redirected to OneDrive, both profile targets miss. Check
-  `[Environment]::GetFolderPath('MyDocuments')` before assuming.
+  shared `scripts/lib/winget.ps1` retry helpers. Fresh Windows can intermittently
+  return `Unrecognized command: '...\winget.exe'` when winget commands run
+  back-to-back (winget-cli#5376); keep the retry instead of calling winget
+  directly.
+- If `Documents` is redirected to OneDrive, chezmoi's `Documents/...` targets
+  miss. The 5.1 shim checks both the shell folder and `$HOME\Documents`, but
+  check `[Environment]::GetFolderPath('MyDocuments')` before assuming the apply
+  path is correct.
 
 ## Generated content
 

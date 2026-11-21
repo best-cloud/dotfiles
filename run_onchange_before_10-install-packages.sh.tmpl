@@ -6,27 +6,14 @@
 # rendered contents change, so adding a package below is all that is needed.
 set -eu
 
-# WSL appends the Windows PATH, so a bare `command -v` can resolve a shim under
-# /mnt (for example the Windows npm prettier). Those are slow when launched from
-# Linux and mishandle Linux paths, so a tool only counts as installed when the
-# executable is native.
-native_cmd() {
-    _p=$(command -v "$1" 2>/dev/null) || return 1
-    case "$_p" in
-    /mnt/* | *.exe) return 1 ;;
-    esac
-    return 0
-}
-
-SUDO=""
+{{ include "scripts/lib/shell.sh" }}
+{{ include "scripts/lib/installers.sh" }}
+if ! can_root; then
+    echo "error: root or sudo is required to install packages" >&2
+    exit 1
+fi
 if [ "$(id -u)" -ne 0 ]; then
-    if native_cmd sudo; then
-        SUDO=sudo
-        sudo -v
-    else
-        echo "error: root or sudo is required to install packages" >&2
-        exit 1
-    fi
+    sudo -v
 fi
 
 # Upstream installers place binaries here. OpenCode uses ~/.opencode/bin, and
@@ -46,6 +33,8 @@ STARSHIP_MIN_VERSION=1.27.0
 
 # Tools packaged by every supported Ubuntu release. Optional tools are checked
 # with apt-cache below and installed by their upstream installer if missing.
+# bsdextrautils provides col, which fish's MANPAGER pipeline uses to strip
+# overstrike codes before bat renders a man page.
 PACKAGES="
 ca-certificates
 curl
@@ -66,6 +55,7 @@ tree
 htop
 btop
 tmux
+bsdextrautils
 mosh
 neovim
 emacs
@@ -82,10 +72,11 @@ opencode
 fnm
 prettier
 shfmt
+shellcheck
 "
 
 echo "==> apt-get update"
-$SUDO env DEBIAN_FRONTEND=noninteractive apt-get update -y
+as_root env DEBIAN_FRONTEND=noninteractive apt-get update -y
 
 available=""
 unavailable=""
@@ -106,7 +97,7 @@ done
 if [ -n "$available" ]; then
     echo "==> apt-get install:$available"
     # shellcheck disable=SC2086  # word splitting of the package list is intended
-    $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $available
+    as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $available
 fi
 
 # Fall back to the upstream installer only for tools that this Ubuntu release
@@ -117,14 +108,8 @@ for pkg in $unavailable; do
     starship)
         has starship && continue
         echo "==> installing starship (not packaged by this Ubuntu release)"
-        tmpfile=$(mktemp)
-        if curl -fsSL https://starship.rs/install.sh -o "$tmpfile"; then
-            sh "$tmpfile" -y -b "$HOME/.local/bin" ||
-                echo "warning: starship installation failed" >&2
-        else
-            echo "warning: starship download failed" >&2
-        fi
-        rm -f "$tmpfile"
+        install_from_url starship https://starship.rs/install.sh \
+            sh -y -b "$HOME/.local/bin"
         ;;
     zellij)
         has zellij && continue
@@ -150,14 +135,7 @@ for pkg in $unavailable; do
     uv)
         has uv && continue
         echo "==> installing uv (not packaged by this Ubuntu release)"
-        tmpfile=$(mktemp)
-        if curl -LsSf https://astral.sh/uv/install.sh -o "$tmpfile"; then
-            sh "$tmpfile" ||
-                echo "warning: uv installation failed" >&2
-        else
-            echo "warning: uv download failed" >&2
-        fi
-        rm -f "$tmpfile"
+        install_from_url uv https://astral.sh/uv/install.sh sh
         ;;
     ruff)
         has ruff && continue
@@ -176,27 +154,13 @@ for pkg in $unavailable; do
         # systemd the binary is still installed and `ollama serve` works.
         has ollama && continue
         echo "==> installing ollama (not packaged by apt)"
-        tmpfile=$(mktemp)
-        if curl -fsSL https://ollama.com/install.sh -o "$tmpfile"; then
-            $SUDO sh "$tmpfile" ||
-                echo "warning: ollama installation failed" >&2
-        else
-            echo "warning: ollama download failed" >&2
-        fi
-        rm -f "$tmpfile"
+        install_from_url ollama https://ollama.com/install.sh as_root_sh
         ;;
     opencode)
         has opencode && continue
         echo "==> installing opencode (not packaged by apt)"
-        tmpfile=$(mktemp)
-        if curl -fsSL https://opencode.ai/v2/install -o "$tmpfile"; then
-            # --no-modify-path: fish/PowerShell configs already add ~/.opencode/bin.
-            bash "$tmpfile" --no-modify-path ||
-                echo "warning: opencode installation failed" >&2
-        else
-            echo "warning: opencode download failed" >&2
-        fi
-        rm -f "$tmpfile"
+        # --no-modify-path: fish/PowerShell configs already add ~/.opencode/bin.
+        install_from_url opencode https://opencode.ai/v2/install bash --no-modify-path
         ;;
     fnm)
         # Node.js is managed by fnm on Linux and macOS, never by apt or
@@ -204,16 +168,10 @@ for pkg in $unavailable; do
         # `fnm use`/`.node-version` is how versions are switched per project.
         if ! has fnm; then
             echo "==> installing fnm (not packaged by this Ubuntu release)"
-            tmpfile=$(mktemp)
-            if curl -fsSL https://fnm.vercel.app/install -o "$tmpfile"; then
-                # --skip-shell: fish and the Spacemacs config wire fnm up, and
-                # the installer would otherwise edit the login shell's rc file.
-                bash "$tmpfile" --skip-shell --install-dir "$HOME/.local/share/fnm" ||
-                    echo "warning: fnm installation failed" >&2
-            else
-                echo "warning: fnm download failed" >&2
-            fi
-            rm -f "$tmpfile"
+            # --skip-shell: fish and the Spacemacs config wire fnm up, and the
+            # installer would otherwise edit the login shell's rc file.
+            install_from_url fnm https://fnm.vercel.app/install bash \
+                --skip-shell --install-dir "$HOME/.local/share/fnm"
             hash -r 2>/dev/null || true
         fi
         if has fnm; then
@@ -255,14 +213,8 @@ if has starship; then
     if [ "$(printf '%s\n%s\n' "$STARSHIP_MIN_VERSION" "${starship_version:-0}" |
         sort -V | head -n 1)" != "$STARSHIP_MIN_VERSION" ]; then
         echo "==> upgrading starship to >= $STARSHIP_MIN_VERSION (found ${starship_version:-unknown})"
-        tmpfile=$(mktemp)
-        if curl -fsSL https://starship.rs/install.sh -o "$tmpfile"; then
-            sh "$tmpfile" -y -b "$HOME/.local/bin" ||
-                echo "warning: starship upgrade failed" >&2
-        else
-            echo "warning: starship download failed" >&2
-        fi
-        rm -f "$tmpfile"
+        install_from_url "starship upgrade" https://starship.rs/install.sh \
+            sh -y -b "$HOME/.local/bin"
         hash -r 2>/dev/null || true
     fi
 fi
@@ -273,6 +225,7 @@ echo "==> Linux packages complete"
 # Install packages on macOS with Homebrew.
 set -eu
 
+{{ include "scripts/lib/brew.sh" }}
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 if ! command -v brew >/dev/null 2>&1; then
@@ -320,6 +273,7 @@ ruff
 ollama
 fnm
 shfmt
+shellcheck
 diffutils
 gnu-tar
 wget
@@ -331,18 +285,8 @@ wget
 # ships GNU tar and Windows gets it from Git for Windows, so it stays out of
 # those lists.
 
-missing=""
-for pkg in $BREW_PACKAGES; do
-    if ! brew list --formula "$pkg" >/dev/null 2>&1; then
-        missing="$missing $pkg"
-    fi
-done
-
-if [ -n "$missing" ]; then
-    echo "==> brew install:$missing"
-    # shellcheck disable=SC2086  # word splitting of the package list is intended
-    brew install $missing
-fi
+# shellcheck disable=SC2086  # word splitting of the package list is intended
+brew_install_missing formula $BREW_PACKAGES
 
 # OpenCode's Homebrew formula lives in the upstream tap instead of homebrew-core.
 if ! command -v opencode >/dev/null 2>&1; then
@@ -361,18 +305,8 @@ postman
 wechatwebdevtools
 "
 
-missing_casks=""
-for cask in $BREW_CASKS; do
-    if ! brew list --cask "$cask" >/dev/null 2>&1; then
-        missing_casks="$missing_casks $cask"
-    fi
-done
-
-if [ -n "$missing_casks" ]; then
-    echo "==> brew install --cask:$missing_casks"
-    # shellcheck disable=SC2086  # word splitting of the cask list is intended
-    brew install --cask $missing_casks
-fi
+# shellcheck disable=SC2086  # word splitting of the cask list is intended
+brew_install_missing cask $BREW_CASKS
 
 # Node.js is managed by fnm on Linux and macOS, never by apt or Homebrew: the
 # distro formulae lag behind, and `fnm install --lts` plus `fnm use` or a

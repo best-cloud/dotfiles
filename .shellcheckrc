@@ -1,0 +1,5 @@
+# All managed shell scripts target POSIX sh (dash on Ubuntu, sh on macOS).
+shell=sh
+
+# The scripts intentionally source /etc/os-release and /etc/profile-style files.
+external-sources=false

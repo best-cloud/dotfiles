@@ -32,19 +32,24 @@ opt.undofile = true
 opt.scrolloff = 8
 opt.colorcolumn = "100"
 
+-- Keep undo files in the state directory instead of next to edited files.
+local undodir = vim.fn.stdpath("state") .. "/undo"
+vim.fn.mkdir(undodir, "p")
+opt.undodir = undodir
+
 -- Keep visual-mode indentation after pressing Tab.
-vim.keymap.set("v", "<", "<gv")
-vim.keymap.set("v", ">", ">gv")
+vim.keymap.set("v", "<", "<gv", { desc = "Indent left and keep selection" })
+vim.keymap.set("v", ">", ">gv", { desc = "Indent right and keep selection" })
 
 -- Navigation between splits.
-vim.keymap.set("n", "<C-h>", "<C-w>h")
-vim.keymap.set("n", "<C-j>", "<C-w>j")
-vim.keymap.set("n", "<C-k>", "<C-w>k")
-vim.keymap.set("n", "<C-l>", "<C-w>l")
+vim.keymap.set("n", "<C-h>", "<C-w>h", { desc = "Go to left split" })
+vim.keymap.set("n", "<C-j>", "<C-w>j", { desc = "Go to lower split" })
+vim.keymap.set("n", "<C-k>", "<C-w>k", { desc = "Go to upper split" })
+vim.keymap.set("n", "<C-l>", "<C-w>l", { desc = "Go to right split" })
 
 -- Clear search highlighting.
-vim.keymap.set("n", "<leader>nh", "<cmd>nohlsearch<cr>")
+vim.keymap.set("n", "<leader>nh", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
 
 -- Save and quit.
-vim.keymap.set("n", "<leader>w", "<cmd>write<cr>")
-vim.keymap.set("n", "<leader>q", "<cmd>quit<cr>")
+vim.keymap.set("n", "<leader>w", "<cmd>write<cr>", { desc = "Write buffer" })
+vim.keymap.set("n", "<leader>q", "<cmd>quit<cr>", { desc = "Quit window" })

@@ -8,14 +8,7 @@ set -eu
 
 # WSL appends the Windows PATH; a /mnt git.exe would clone Windows-style paths
 # and permissions into ~/.emacs.d, so require the native git.
-native_cmd() {
-    _p=$(command -v "$1" 2>/dev/null) || return 1
-    case "$_p" in
-    /mnt/* | *.exe) return 1 ;;
-    esac
-    return 0
-}
-
+{{ include "scripts/lib/shell.sh" }}
 if ! native_cmd git; then
     echo "warning: git is not installed; skipping the Spacemacs clone" >&2
     exit 0

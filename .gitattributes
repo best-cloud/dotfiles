@@ -1,0 +1,17 @@
+* text=auto
+
+# Shell scripts must stay LF even when checked out on Windows (bootstrap and
+# the rendered run_onchange_ scripts run under sh on Linux/macOS).
+*.sh text eol=lf
+*.sh.tmpl text eol=lf
+
+# PowerShell accepts LF and the repository keeps files LF so chezmoi does not
+# rewrite targets when moving between machines.
+*.ps1 text eol=lf
+*.ps1.tmpl text eol=lf
+
+# Generated and hand-written config files are easiest to diff with LF.
+*.json text eol=lf
+*.kdl text eol=lf
+*.lua text eol=lf
+*.toml text eol=lf

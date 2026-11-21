@@ -23,7 +23,8 @@ Design principles:
 ## One-command restore
 
 This repository is configured for `github.com/best-cloud/dotfiles`. If you
-fork it, update the URLs in `bootstrap.sh`, `bootstrap.ps1`, and here.
+fork it, update the URLs in `bootstrap.sh.tmpl`, `bootstrap.ps1.tmpl`, and here,
+then regenerate the entry points with `scripts/render-bootstrap.sh`.
 
 ### Ubuntu Server, WSL2, macOS
 
@@ -76,8 +77,9 @@ enable it while systemd is not running).
 ### Repository URL
 
 The bootstraps use `https://github.com/best-cloud/dotfiles.git`. If you fork
-or rename the repository, update `REPO` in `bootstrap.sh`, `$Repo` in
-`bootstrap.ps1`, and the URLs above.
+or rename the repository, update `REPO` in `bootstrap.sh.tmpl`, `$Repo` in
+`bootstrap.ps1.tmpl`, and the URLs above, then run
+`scripts/render-bootstrap.sh`.
 
 For a private repository, make sure the fresh machine can authenticate to
 GitHub (SSH key or `gh auth login`), or pass an SSH URL through
@@ -88,14 +90,14 @@ GitHub (SSH key or `gh auth login`), or pass an SSH URL through
 | | Ubuntu / WSL2 (apt) | macOS (Homebrew) | Windows 11 (winget) |
 |---|---|---|---|
 | Shell / prompt | fish, starship | fish, starship | PowerShell 7, Starship |
-| Core CLI | git, curl, wget, build-essential, unzip, zip | git, wget | Git |
+| Core CLI | git, curl, wget, build-essential, unzip, zip, bsdextrautils (col) | git, wget | Git |
 | Modern CLI | ripgrep, fd-find, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq |
 | Editors / multiplexers | neovim, emacs, zellij | neovim, emacs, zellij | Neovim, Emacs, Zellij |
 | Dev tools | gh, direnv, uv, lazygit, mosh | gh, direnv, uv, lazygit, mosh, WeChat DevTools, Postman | gh, uv, lazygit, WeChat DevTools, Postman (mosh via WSL) |
 | Containers | podman | podman | — |
 | Node.js | fnm + Node.js LTS (no apt) | fnm + Node.js LTS (no Homebrew) | Node.js LTS (winget) |
 | AI / Python tooling | opencode, ruff, ollama | opencode, ruff, ollama | OpenCode, Ruff (ollama via WSL) |
-| Formatters | prettier, shfmt | prettier, shfmt | Prettier, shfmt |
+| Formatters / linters | prettier, shfmt, shellcheck | prettier, shfmt, shellcheck | Prettier, shfmt, ShellCheck |
 | Optional daily-use apps | — | see below | see below |
 | Terminal | — (client terminal) | Ghostty | Windows Terminal, WezTerm |
 | WSL2 / Ubuntu | — (native) | — | Microsoft.WSL + latest Ubuntu LTS |
@@ -109,6 +111,11 @@ falls back to the official installer (the GitHub release binary for zellij,
 `eza` and `lazygit` are installed from apt when the release provides them;
 otherwise the script prints a warning and continues, and the shell config still
 works without them.
+
+`bsdextrautils` is a Linux-only dependency: it provides `col`, which the fish
+`MANPAGER` pipeline uses to strip overstrike codes before `bat` renders a man
+page. macOS ships `col` with the base system, and fish is not managed on
+Windows, so the package has no counterpart in the Homebrew or winget lists.
 
 Podman is installed on Ubuntu and macOS but not on Windows. On macOS it is only
 the client; run `podman machine init` once before the first container so it can
@@ -138,7 +145,7 @@ The script therefore installs the upstream Starship release into
 `~/.local/bin` when the packaged version is older. That directory comes first
 in `PATH`, so the newer binary shadows `/usr/bin/starship`.
 
-### Node.js, prettier and shfmt
+### Node.js, prettier and linters
 
 Node.js is never installed by apt or Homebrew. The Linux script installs
 [fnm](https://github.com/Schniz/fnm) with its upstream installer into
@@ -161,7 +168,8 @@ Prettier is installed with `npm install -g --prefix "$HOME/.local" prettier` on
 every platform, including macOS. It is deliberately not the Homebrew `prettier`
 formula, because that formula depends on Homebrew's Node.js. Installing it into
 `~/.local` keeps `prettier` on `PATH` regardless of which fnm version is active.
-`shfmt` comes from apt, Homebrew and winget.
+`shfmt` and `shellcheck` come from apt, Homebrew and winget; they are the
+linters used by `scripts/check.sh`.
 
 WSL appends the Windows `PATH`, so the install probes ignore non-native
 executables (paths under `/mnt` or ending in `.exe`). Otherwise an inherited
@@ -220,8 +228,10 @@ missing:
   third-party repositories in other files are untouched.
 - No legacy `/etc/apt/sources.list` is written.
 
-The same logic runs early in `bootstrap.sh`, because the bootstrap installs
-git and curl before chezmoi can apply anything. Keep the two copies in sync.
+The same implementation is shared by `bootstrap.sh` and the `05` script through
+`scripts/lib/ubuntu-mirror.sh`, because the bootstrap installs git and curl
+before chezmoi can apply anything. The generated bootstrap inlines that helper,
+so it stays standalone.
 TUNA may lag behind the official security archive by a few minutes; switch the
 security suite back to `http://security.ubuntu.com/ubuntu` in the script if a
 production machine needs immediate security updates.
@@ -231,8 +241,17 @@ production machine needs immediate security updates.
 ```text
 .
 ├── .chezmoi.toml.tmpl                  # machine data + prompts (sourceDir, name, email, isWSL)
-├── .chezmoiignore                      # OS-specific targets
-├── bootstrap.sh / bootstrap.ps1        # one-command entry points
+├── .chezmoiignore                      # OS-specific and repo-only targets
+├── .editorconfig                       # whitespace/indentation rules
+├── .gitattributes                      # line-ending rules
+├── .shellcheckrc                       # shellcheck target shell
+├── bootstrap.sh.tmpl / bootstrap.ps1.tmpl   # one-command entry point sources
+├── bootstrap.sh / bootstrap.ps1             # generated standalone entry points
+├── scripts/
+│   ├── check.sh                             # render + lint everything locally or in CI
+│   ├── render-bootstrap.sh                  # regenerate bootstrap.sh/bootstrap.ps1
+│   └── lib/                                 # shared shell/PowerShell fragments
+├── .github/workflows/ci.yml            # Linux + macOS check job
 ├── dot_gitconfig.tmpl                  # single Git config for all OSes
 ├── dot_gitignore_global
 ├── dot_spacemacs                       # default Spacemacs develop dotfile + TUNA ELPA
@@ -248,7 +267,7 @@ production machine needs immediate security updates.
 │       └── LocalState/settings.json    # Windows Terminal, Catppuccin Mocha
 ├── Documents/
 │   ├── PowerShell/
-│   │   └── Microsoft.PowerShell_profile.ps1        # PowerShell 7
+│   │   └── Microsoft.PowerShell_profile.ps1.tmpl   # PowerShell 7
 │   └── WindowsPowerShell/
 │       └── Microsoft.PowerShell_profile.ps1        # PS 5.1 shim
 ├── run_onchange_before_05-ubuntu-mirror.sh.tmpl       # TUNA apt mirror
@@ -274,6 +293,13 @@ The scripts are templates too. On the wrong OS a script renders to whitespace,
 and chezmoi skips whitespace-only scripts entirely. That is why a `.ps1`
 script is safe in the same repo as Linux/macOS `.sh` scripts.
 
+Shared POSIX shell and PowerShell helpers live in `scripts/lib/` and are inlined
+with chezmoi's `include` function, so each rendered script stays self-contained
+while the source has one copy. `bootstrap.sh` and `bootstrap.ps1` are generated
+from their `.tmpl` sources by `scripts/render-bootstrap.sh`; that keeps them
+standalone at runtime while sharing the same helpers. Edit the templates or the
+libraries, then run the renderer and `scripts/check.sh`.
+
 To force every `run_onchange_` script to run again, delete its entry from
 chezmoi's state. Script hashes are stored in `entryState` (the old
 `--bucket=scriptState` is no longer used by current chezmoi):
@@ -282,6 +308,36 @@ chezmoi's state. Script hashes are stored in `entryState` (the old
 chezmoi state dump   # script entries have "type": "script"
 chezmoi state delete --bucket=entryState --key="$HOME/10-install-packages.sh"
 chezmoi apply
+```
+
+### Static checks
+
+`scripts/check.sh` renders every template into a temporary directory with a
+scratch chezmoi config, then validates the output:
+
+- `sh -n`, `shellcheck` and `shfmt` for shell scripts;
+- `fish -n` for the fish config;
+- the PowerShell parser for `.ps1` files, including the Windows branches of
+  `.ps1.tmpl` files (the Go template wrapper is stripped and includes expanded);
+- JSON, TOML and Lua parsing for the configs, and `git config` for the rendered
+  Git config;
+- a sync check that fails when `bootstrap.sh` or `bootstrap.ps1` differs from
+  its rendered template.
+
+Missing optional tools are skipped, so the script is useful on a fresh machine.
+`.github/workflows/ci.yml` runs it on Linux and macOS with the tools installed,
+and runs `actionlint` on the workflow itself on Linux. Run the checks before
+committing a change:
+
+```sh
+sh scripts/check.sh
+```
+
+After editing `bootstrap.sh.tmpl`, `bootstrap.ps1.tmpl`, or anything under
+`scripts/lib/`, regenerate the standalone entry points and commit both files:
+
+```sh
+./scripts/render-bootstrap.sh
 ```
 
 ### Adding an application
@@ -427,11 +483,12 @@ when that matters.
   PowerShell profile are applied. If your winget policy requires machine-wide
   installs, run it from an elevated PowerShell; user-scope installs work from a
   normal window.
-- The main profile is `Documents/PowerShell/Microsoft.PowerShell_profile.ps1`
-  for PowerShell 7. Windows PowerShell 5.1 uses a different path, so
+- The PowerShell 7 profile template is
+  `Documents/PowerShell/Microsoft.PowerShell_profile.ps1.tmpl`. Windows
+  PowerShell 5.1 uses a different path, so
   `Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1` is a tiny shim
-  that dot-sources the PS7 profile. If your `Documents` folder is redirected to
-  OneDrive, edit both paths in the repo (or ignore them and keep local copies).
+  that dot-sources the PS7 profile. The shim checks both the shell's `Documents`
+  folder and `%USERPROFILE%\Documents`, so a OneDrive redirect still works.
 - The profile sets `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME` and
   `XDG_CACHE_HOME` to Unix-style locations under your home directory. This lets
   Neovim, Starship, Zellij and WezTerm use the same managed config files as
@@ -496,8 +553,9 @@ on save:
   `python-format-on-save t`. Spacemacs uses the `ruff-format` package for both
   the on-save hook and `SPC m =` on the current buffer.
 - The other languages have no on-save formatter and no formatter wiring in
-  `dotspacemacs/user-config`. `prettier` and `shfmt` are still installed by the
-  package scripts, but only as CLI tools; Spacemacs does not call them.
+  `dotspacemacs/user-config`. `prettier`, `shfmt` and `shellcheck` are still
+  installed by the package scripts, but only as CLI tools; Spacemacs does not
+  call them.
 - `dotspacemacs/user-init` adds the Homebrew directories to `exec-path` before
   packages load, so quelpa uses `gtar` instead of macOS' BSD tar; BSD tar adds
   AppleDouble `._*` members that break the `code-review` build.
@@ -563,9 +621,13 @@ chezmoi apply --dry-run --verbose \
 Render one template:
 
 ```sh
-chezmoi execute-template < dot_config/fish/config.fish.tmpl > /tmp/config.fish
+chezmoi execute-template --source . < dot_config/fish/config.fish.tmpl > /tmp/config.fish
 fish -n /tmp/config.fish     # syntax check
 ```
+
+Windows PowerShell 5.1 does not support `<` redirection, so use
+`Get-Content -Raw dot_config/fish/config.fish.tmpl | chezmoi execute-template --source .`.
+`sh scripts/check.sh` renders and checks every template in one step.
 
 Check what chezmoi manages and would change:
 

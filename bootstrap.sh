@@ -8,22 +8,251 @@
 #   sh -c "$(curl -fsSL https://raw.githubusercontent.com/best-cloud/dotfiles/main/bootstrap.sh)"
 #
 # Set CHEZMOI_REPO to override the repository URL, or change REPO below.
+#
+# Generated from bootstrap.sh.tmpl by scripts/render-bootstrap.sh. Edit the
+# template or scripts/lib/*.sh instead of this file.
 set -eu
+
+# Shared POSIX shell helpers.
+#
+# This file is included verbatim by the chezmoi templates and by the generated
+# bootstrap script. Keep it free of top-level side effects and safe to source
+# under `set -eu`.
+
+# WSL appends the Windows PATH, so a bare `command -v` can resolve a Windows
+# shim under /mnt. Those are slow from Linux and mishandle Linux paths, so only
+# count native executables.
+native_cmd() {
+    case "$(command -v "$1" 2>/dev/null || true)" in
+    '' | /mnt/* | *.exe) return 1 ;;
+    *) return 0 ;;
+    esac
+}
+
+can_root() {
+    [ "$(id -u)" -eq 0 ] || native_cmd sudo
+}
+
+as_root() {
+    if [ "$(id -u)" -eq 0 ]; then
+        "$@"
+    else
+        sudo "$@"
+    fi
+}
+
+# Download a URL to stdout.
+#
+# Requires native_cmd from shell.sh. Kept separate because only the bootstrap
+# needs to stream a script; the package installers download to a file.
+
+fetch() {
+    if native_cmd curl; then
+        curl -fsSL "$1"
+    elif native_cmd wget; then
+        wget -qO- "$1"
+    else
+        echo "error: curl or wget is required" >&2
+        return 1
+    fi
+}
+
+# Point Ubuntu's apt sources at the Tsinghua TUNA mirror (deb822).
+#
+# The repository targets the current Ubuntu LTS (26.04+), which uses
+# /etc/apt/sources.list.d/ubuntu.sources. The rewrite is idempotent: the source
+# file is replaced only when its content differs, the original is backed up
+# once, and third-party repositories in other files are untouched.
+#
+# https://mirrors.tuna.tsinghua.edu.cn/help/ubuntu/
+#
+# Requires native_cmd/can_root/as_root from shell.sh.
+
+configure_ubuntu_mirror() {
+    [ -r /etc/os-release ] || return 0
+    native_cmd apt-get || return 0
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    [ "${ID:-}" = ubuntu ] || return 0
+
+    case "$(uname -m)" in
+    x86_64 | amd64) _mirror_url=https://mirrors.tuna.tsinghua.edu.cn/ubuntu ;;
+    aarch64 | arm64) _mirror_url=https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports ;;
+    *)
+        echo "warning: no TUNA mirror mapping for $(uname -m); keeping apt sources" >&2
+        return 0
+        ;;
+    esac
+
+    _mirror_codename="${VERSION_CODENAME:-${UBUNTU_CODENAME:-}}"
+    if [ -z "$_mirror_codename" ]; then
+        echo "warning: could not determine the Ubuntu codename; keeping apt sources" >&2
+        return 0
+    fi
+
+    if ! can_root; then
+        echo "warning: sudo is required to update apt sources; skipping" >&2
+        return 0
+    fi
+
+    _mirror_sources=/etc/apt/sources.list.d/ubuntu.sources
+    _mirror_tmp=$(mktemp) || return 0
+    trap 'rm -f "$_mirror_tmp"' EXIT
+    cat >"$_mirror_tmp" <<EOF
+# Managed by chezmoi: TUNA mirror, https://mirrors.tuna.tsinghua.edu.cn/help/ubuntu/
+Types: deb
+URIs: $_mirror_url
+Suites: $_mirror_codename $_mirror_codename-updates $_mirror_codename-backports
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb
+URIs: $_mirror_url
+Suites: $_mirror_codename-security
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+EOF
+
+    if [ -f "$_mirror_sources" ] && cmp -s "$_mirror_tmp" "$_mirror_sources"; then
+        rm -f "$_mirror_tmp"
+        trap - EXIT
+        return 0
+    fi
+
+    if [ -f "$_mirror_sources" ] && [ ! -f "$_mirror_sources.orig" ]; then
+        as_root cp -a "$_mirror_sources" "$_mirror_sources.orig"
+    fi
+
+    as_root mkdir -p /etc/apt/sources.list.d
+    as_root install -m 0644 "$_mirror_tmp" "$_mirror_sources"
+    rm -f "$_mirror_tmp"
+    trap - EXIT
+    echo "==> apt sources now use $_mirror_url"
+}
+
+# WSL only: enable systemd in /etc/wsl.conf.
+#
+# The Ollama installer and other services expect a service manager. Merge the
+# [boot] section instead of replacing the file, so [automount], [interop],
+# [user] and other settings survive. systemd starts only after `wsl --shutdown`
+# on Windows and a new session, so the rest of the bootstrap still runs without
+# it.
+#
+# Requires can_root/as_root from shell.sh.
+
+configure_wsl_systemd() {
+    [ -r /proc/version ] || return 0
+    grep -qi microsoft /proc/version || return 0
+
+    if ! can_root; then
+        echo "warning: sudo is required to enable systemd in /etc/wsl.conf; skipping" >&2
+        return 0
+    fi
+
+    _wsl_conf=/etc/wsl.conf
+    _wsl_tmp=$(mktemp) || return 0
+    trap 'rm -f "$_wsl_tmp"' EXIT
+
+    if [ -f "$_wsl_conf" ]; then
+        awk '
+        function flush_boot() {
+            if (in_boot && !boot_written) {
+                print "systemd=true"
+                boot_written = 1
+            }
+        }
+        /^[[:space:]]*\[/ {
+            flush_boot()
+            header = $0
+            gsub(/\r/, "", header)
+            sub(/[[:space:]]*#.*$/, "", header)
+            sub(/^[[:space:]]+/, "", header)
+            sub(/[[:space:]]+$/, "", header)
+            in_boot = (header == "[boot]")
+            if (in_boot) boot_seen = 1
+            print
+            next
+        }
+        in_boot && /^[[:space:]]*systemd[[:space:]]*=/ {
+            if (!boot_written) {
+                print "systemd=true"
+                boot_written = 1
+            }
+            next
+        }
+        { print }
+        END {
+            flush_boot()
+            if (!boot_seen) {
+                print ""
+                print "[boot]"
+                print "systemd=true"
+            }
+        }' "$_wsl_conf" >"$_wsl_tmp"
+    else
+        printf '[boot]\nsystemd=true\n' >"$_wsl_tmp"
+    fi
+
+    if [ -f "$_wsl_conf" ] && cmp -s "$_wsl_tmp" "$_wsl_conf"; then
+        rm -f "$_wsl_tmp"
+        trap - EXIT
+        return 0
+    fi
+
+    if [ -f "$_wsl_conf" ] && [ ! -f "$_wsl_conf.orig" ]; then
+        as_root cp -a "$_wsl_conf" "$_wsl_conf.orig"
+    fi
+
+    as_root install -m 0644 "$_wsl_tmp" "$_wsl_conf"
+    rm -f "$_wsl_tmp"
+    trap - EXIT
+    echo "==> enabled systemd in /etc/wsl.conf (run 'wsl --shutdown' on Windows to apply)"
+}
+
+# Bootstrap helpers shared by the generated bootstrap.sh.
+#
+# Requires native_cmd/can_root/as_root from shell.sh and fetch from fetch.sh.
+
+# Install the tools that the one-line bootstrap needs before chezmoi exists.
+install_bootstrap_prerequisites() {
+    if native_cmd git && { native_cmd curl || native_cmd wget; }; then
+        return 0
+    fi
+
+    if native_cmd apt-get; then
+        echo "==> installing bootstrap prerequisites (git, curl)"
+        if ! can_root; then
+            echo "error: sudo is required to install git" >&2
+            exit 1
+        fi
+        as_root env DEBIAN_FRONTEND=noninteractive apt-get update -y
+        as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates curl
+    fi
+}
+
+install_chezmoi() {
+    if native_cmd chezmoi; then
+        return 0
+    fi
+
+    echo "==> installing chezmoi"
+    if [ "$(uname -s)" = Darwin ] && native_cmd brew; then
+        brew install chezmoi
+    else
+        fetch https://get.chezmoi.io | sh -s -- -b "$HOME/.local/bin"
+    fi
+}
 
 REPO="${CHEZMOI_REPO:-https://github.com/best-cloud/dotfiles.git}"
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd || pwd)
+# Do not let a caller's CDPATH make `cd` print or pick another directory.
+unset CDPATH
 
-# WSL appends the Windows PATH, so a bare `command -v` can resolve a Windows
-# shim under /mnt (for example curl.exe or gsudo.exe). Those are slow when
-# launched from Linux and use Windows paths, so only count native executables.
-native_cmd() {
-    _p=$(command -v "$1" 2>/dev/null) || return 1
-    case "$_p" in
-    /mnt/* | *.exe) return 1 ;;
-    esac
-    return 0
-}
+script_dir=$(dirname -- "$0")
+if ! SCRIPT_DIR=$(cd -- "$script_dir" 2>/dev/null && pwd); then
+    SCRIPT_DIR=$(pwd)
+fi
 
 # An explicit CHEZMOI_REPO wins; otherwise use the local checkout if there is
 # one, and finally fall back to the repository URL.
@@ -35,14 +264,6 @@ else
     LOCAL=0
 fi
 
-fetch() {
-    if native_cmd curl; then
-        curl -fsSL "$1"
-    else
-        wget -qO- "$1"
-    fi
-}
-
 # Cache sudo credentials up front so the package script does not stop halfway.
 if [ "$(id -u)" -ne 0 ] && native_cmd sudo; then
     sudo -v || true
@@ -51,147 +272,9 @@ fi
 PATH="$HOME/.local/bin:$PATH"
 export PATH
 
-# WSL only: enable systemd in /etc/wsl.conf. The Ollama installer and other
-# services expect a service manager. Merge the [boot] section instead of
-# replacing the file, so [automount], [interop], [user] and other settings
-# survive. systemd starts only after `wsl --shutdown` on Windows and a new
-# session, so the rest of this bootstrap still runs without it.
-if [ -r /proc/version ] && grep -qi microsoft /proc/version; then
-    WSL_SUDO=""
-    if [ "$(id -u)" -ne 0 ]; then
-        if native_cmd sudo; then
-            WSL_SUDO=sudo
-        else
-            echo "warning: sudo is required to enable systemd in /etc/wsl.conf; skipping" >&2
-        fi
-    fi
-    if [ "$(id -u)" -eq 0 ] || [ -n "$WSL_SUDO" ]; then
-        conf=/etc/wsl.conf
-        new=$(mktemp)
-        if [ -f "$conf" ]; then
-            awk '
-            function flush_boot() {
-                if (in_boot && !boot_written) {
-                    print "systemd=true"
-                    boot_written = 1
-                }
-            }
-            /^[[:space:]]*\[/ {
-                flush_boot()
-                header = $0
-                gsub(/\r/, "", header)
-                sub(/[[:space:]]*#.*$/, "", header)
-                sub(/^[[:space:]]+/, "", header)
-                sub(/[[:space:]]+$/, "", header)
-                in_boot = (header == "[boot]")
-                if (in_boot) boot_seen = 1
-                print
-                next
-            }
-            in_boot && /^[[:space:]]*systemd[[:space:]]*=/ {
-                if (!boot_written) {
-                    print "systemd=true"
-                    boot_written = 1
-                }
-                next
-            }
-            { print }
-            END {
-                flush_boot()
-                if (!boot_seen) {
-                    print ""
-                    print "[boot]"
-                    print "systemd=true"
-                }
-            }' "$conf" >"$new"
-        else
-            printf '[boot]\nsystemd=true\n' >"$new"
-        fi
-        if [ -f "$conf" ] && [ "$(cat "$new")" = "$(cat "$conf")" ]; then
-            rm -f "$new"
-        else
-            if [ -f "$conf" ] && [ ! -f "$conf.orig" ]; then
-                $WSL_SUDO cp -a "$conf" "$conf.orig"
-            fi
-            $WSL_SUDO install -m 0644 "$new" "$conf"
-            rm -f "$new"
-            echo "==> enabled systemd in /etc/wsl.conf (run 'wsl --shutdown' on Windows to apply)"
-        fi
-    fi
-fi
-
-# Point apt at the Tsinghua TUNA mirror before installing prerequisites, so the
-# whole bootstrap is fast. Ubuntu 24.04+ (including the current LTS) uses the
-# deb822 format. Keep this in sync with
-# run_onchange_before_05-ubuntu-mirror.sh.tmpl.
-if [ -r /etc/os-release ] && command -v apt-get >/dev/null 2>&1; then
-    # shellcheck disable=SC1091
-    . /etc/os-release
-    if [ "${ID:-}" = ubuntu ]; then
-        mirror=""
-        case "$(uname -m)" in
-        x86_64 | amd64) mirror=https://mirrors.tuna.tsinghua.edu.cn/ubuntu ;;
-        aarch64 | arm64) mirror=https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports ;;
-        esac
-        codename="${VERSION_CODENAME:-${UBUNTU_CODENAME:-}}"
-        if [ -n "$mirror" ] && [ -n "$codename" ] &&
-            { [ "$(id -u)" -eq 0 ] || native_cmd sudo; }; then
-            MIRROR_SUDO=""
-            if [ "$(id -u)" -ne 0 ]; then
-                MIRROR_SUDO=sudo
-            fi
-            deb822=/etc/apt/sources.list.d/ubuntu.sources
-            new=$(mktemp)
-            cat >"$new" <<EOF
-# Managed by chezmoi: TUNA mirror, https://mirrors.tuna.tsinghua.edu.cn/help/ubuntu/
-Types: deb
-URIs: $mirror
-Suites: $codename $codename-updates $codename-backports
-Components: main restricted universe multiverse
-Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-
-Types: deb
-URIs: $mirror
-Suites: $codename-security
-Components: main restricted universe multiverse
-Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-EOF
-            if [ -f "$deb822" ] && [ "$(cat "$new")" = "$(cat "$deb822")" ]; then
-                rm -f "$new"
-            else
-                if [ -f "$deb822" ] && [ ! -f "$deb822.orig" ]; then
-                    $MIRROR_SUDO cp -a "$deb822" "$deb822.orig"
-                fi
-                $MIRROR_SUDO mkdir -p /etc/apt/sources.list.d
-                $MIRROR_SUDO install -m 0644 "$new" "$deb822"
-                rm -f "$new"
-                echo "==> apt sources now use $mirror"
-            fi
-        fi
-    fi
-fi
-
-# `chezmoi init <repo>` clones with git, and the one-line bootstrap needs an
-# HTTP client before anything is installed. Fresh Ubuntu Server and WSL images
-# do not always ship git, so install the bootstrap prerequisites first.
-if ! native_cmd git ||
-    { ! native_cmd curl && ! native_cmd wget; }; then
-    if command -v apt-get >/dev/null 2>&1; then
-        echo "==> installing bootstrap prerequisites (git, curl)"
-        SUDO=""
-        if [ "$(id -u)" -ne 0 ]; then
-            if native_cmd sudo; then
-                SUDO=sudo
-            else
-                echo "error: sudo is required to install git" >&2
-                exit 1
-            fi
-        fi
-        $SUDO env DEBIAN_FRONTEND=noninteractive apt-get update -y
-        $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            git ca-certificates curl
-    fi
-fi
+configure_wsl_systemd
+configure_ubuntu_mirror
+install_bootstrap_prerequisites
 
 if ! native_cmd git && [ "$LOCAL" -eq 0 ]; then
     if [ "$(uname -s)" = "Darwin" ]; then
@@ -203,14 +286,7 @@ if ! native_cmd git && [ "$LOCAL" -eq 0 ]; then
     exit 1
 fi
 
-if ! native_cmd chezmoi; then
-    echo "==> installing chezmoi"
-    if [ "$(uname -s)" = "Darwin" ] && native_cmd brew; then
-        brew install chezmoi
-    else
-        fetch https://get.chezmoi.io | sh -s -- -b "$HOME/.local/bin"
-    fi
-fi
+install_chezmoi
 
 if ! native_cmd chezmoi; then
     echo "error: chezmoi installation failed; install it manually and re-run." >&2

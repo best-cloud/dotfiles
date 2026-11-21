@@ -7,24 +7,74 @@
 #   powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1
 #
 # Set -Repo to override the repository URL.
+#
+# Generated from bootstrap.ps1.tmpl by scripts/render-bootstrap.sh. Edit the
+# template or scripts/lib/*.ps1 instead of this file.
+#Requires -Version 5.1
 [CmdletBinding()]
 param(
+    [ValidateNotNullOrEmpty()]
     [string]$Repo = 'https://github.com/best-cloud/dotfiles.git'
 )
 
 $ErrorActionPreference = 'Stop'
 
-function Update-SessionPath {
-    $machine = [Environment]::GetEnvironmentVariable('Path', 'Machine')
-    $user = [Environment]::GetEnvironmentVariable('Path', 'User')
-    $env:Path = "$machine;$user"
+# Add a directory to the current process PATH once.
+#
+# Comparing whole entries instead of matching a substring keeps paths that
+# contain glob characters (for example `[`) from being misdetected.
+function Add-PathEntry {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path
+    )
+
+    if (-not $Path) {
+        return
+    }
+    $entries = $env:Path -split [IO.Path]::PathSeparator
+    if ($entries -notcontains $Path) {
+        $env:Path = "$Path$([IO.Path]::PathSeparator)$env:Path"
+    }
 }
+
+# Shared winget helpers.
+#
+# Included verbatim by the install/optional-apps templates and by the generated
+# bootstrap.ps1. Keep this file free of top-level side effects.
 
 # winget can intermittently fail with "Unrecognized command:
 # '...\winget.exe'" when commands are called back-to-back on a fresh Windows
-# install. The next attempt normally succeeds (winget-cli#5376).
+# install. The next attempt normally succeeds (winget-cli#5376). Exit code
+# -1978335230 is winget's "invalid command line" result for that race.
+function Test-WingetPackage {
+    param(
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Id
+    )
+
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        winget list --id $Id --exact --accept-source-agreements *> $null
+        if ($LASTEXITCODE -eq 0) {
+            return $true
+        }
+        if ($LASTEXITCODE -ne -1978335230) {
+            return $false
+        }
+        if ($attempt -lt 3) {
+            Start-Sleep -Seconds 3
+        }
+    }
+    return $false
+}
+
 function Install-WingetPackage {
-    param([string]$Id)
+    param(
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Id
+    )
 
     for ($attempt = 1; $attempt -le 3; $attempt++) {
         winget install --id $Id --exact --source winget `
@@ -41,6 +91,12 @@ function Install-WingetPackage {
     return $false
 }
 
+function Update-SessionPath {
+    $machine = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+    $user = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $env:Path = "$machine;$user"
+}
+
 if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
     throw 'winget is required. Install "App Installer" from the Microsoft Store and re-run.'
 }
@@ -53,7 +109,7 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Update-SessionPath
     $gitCmd = Join-Path $env:ProgramFiles 'Git\cmd'
     if (Test-Path $gitCmd) {
-        $env:Path = "$gitCmd;$env:Path"
+        Add-PathEntry $gitCmd
     }
 }
 
@@ -67,7 +123,7 @@ if (-not (Get-Command chezmoi -ErrorAction SilentlyContinue)) {
     Update-SessionPath
     $wingetLinks = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'
     if (Test-Path $wingetLinks) {
-        $env:Path = "$wingetLinks;$env:Path"
+        Add-PathEntry $wingetLinks
     }
 }
 

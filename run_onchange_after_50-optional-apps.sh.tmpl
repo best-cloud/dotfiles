@@ -8,6 +8,7 @@
 # the mandatory development tools.
 set -eu
 
+{{ include "scripts/lib/brew.sh" }}
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 if ! command -v brew >/dev/null 2>&1; then
@@ -27,18 +28,8 @@ openvpn-connect
 windows-app
 "
 
-missing=""
-for cask in $BREW_CASKS; do
-    if ! brew list --cask "$cask" >/dev/null 2>&1; then
-        missing="$missing $cask"
-    fi
-done
-
-if [ -n "$missing" ]; then
-    echo "==> brew install --cask:$missing"
-    # shellcheck disable=SC2086  # word splitting of the cask list is intended
-    brew install --cask $missing
-fi
+# shellcheck disable=SC2086  # word splitting of the cask list is intended
+brew_install_missing cask $BREW_CASKS
 
 # FlClash is published in the chen08209/tap tap rather than homebrew-cask, so
 # it is installed separately: a tap failure must not block the casks above.
@@ -46,11 +37,9 @@ fi
 # trusted, so trust this specific cask after tapping and before installing.
 if ! brew list --cask flclash >/dev/null 2>&1; then
     echo "==> brew tap chen08209/tap && brew trust --cask chen08209/tap/flclash"
-    if brew tap chen08209/tap &&
-        brew trust --cask chen08209/tap/flclash &&
-        brew install --cask flclash; then
-        :
-    else
+    if ! brew tap chen08209/tap ||
+        ! brew trust --cask chen08209/tap/flclash ||
+        ! brew install --cask flclash; then
         echo "warning: FlClash installation failed" >&2
     fi
 fi

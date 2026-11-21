@@ -51,8 +51,8 @@ end
 # ---------------------------------------------------------------------------
 # Environment
 # ---------------------------------------------------------------------------
-set -gx EDITOR {{ .editor }}
-set -gx VISUAL {{ .editor }}
+set -gx EDITOR {{ .editor | quote }}
+set -gx VISUAL {{ .editor | quote }}
 set -gx PAGER less
 set -gx LESS -R
 

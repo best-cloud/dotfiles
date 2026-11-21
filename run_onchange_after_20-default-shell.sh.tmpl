@@ -4,16 +4,7 @@
 # Idempotent, and rendered empty on Windows.
 set -eu
 
-# WSL appends the Windows PATH, so `command -v` can find /mnt shims. Never pass
-# a Windows fish.exe to chsh or use gsudo instead of native sudo.
-native_cmd() {
-    _p=$(command -v "$1" 2>/dev/null) || return 1
-    case "$_p" in
-    /mnt/* | *.exe) return 1 ;;
-    esac
-    return 0
-}
-
+{{ include "scripts/lib/shell.sh" }}
 # Homebrew installs fish outside the default PATH, and chezmoi is not
 # necessarily running with `brew shellenv` loaded (a fresh bootstrap is not).
 if [ "$(uname -s)" = "Darwin" ]; then
@@ -37,24 +28,18 @@ if [ "$current_shell" = "$fish_path" ]; then
     exit 0
 fi
 
-SUDO=""
-if [ "$(id -u)" -ne 0 ]; then
-    if native_cmd sudo; then
-        SUDO=sudo
-    else
-        echo "warning: sudo is required to change the login shell; skipping" >&2
-        exit 0
-    fi
+if ! can_root; then
+    echo "warning: sudo is required to change the login shell; skipping" >&2
+    exit 0
 fi
 
 # chsh refuses shells that are not listed in /etc/shells.
 if ! grep -Fqx "$fish_path" /etc/shells 2>/dev/null; then
-    echo "$fish_path" | $SUDO tee -a /etc/shells >/dev/null
+    printf '%s\n' "$fish_path" | as_root tee -a /etc/shells >/dev/null
 fi
 
 echo "==> setting the login shell to $fish_path"
-# shellcheck disable=SC2086  # $SUDO is intentionally empty when running as root
-$SUDO chsh -s "$fish_path" "$(id -un)"
+as_root chsh -s "$fish_path" "$(id -un)"
 
 echo "==> fish is now the login shell; log out and back in (or run: exec fish)"
 {{ end -}}

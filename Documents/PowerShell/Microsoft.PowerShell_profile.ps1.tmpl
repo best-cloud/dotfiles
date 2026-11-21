@@ -4,15 +4,14 @@
 # ---------------------------------------------------------------------------
 # PATH
 # ---------------------------------------------------------------------------
-$localBin = Join-Path $HOME '.local\bin'
-if ($env:Path -notlike "*$localBin*") {
-    $env:Path = "$localBin;$env:Path"
-}
+# The PATH helper is shared with bootstrap.ps1 via scripts/lib/path.ps1.
+{{ include "scripts/lib/path.ps1" }}
+Add-PathEntry (Join-Path $HOME '.local\bin')
 
 # winget installs portable CLI shims here (for example OpenCode).
 $wingetLinks = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'
-if ((Test-Path $wingetLinks) -and ($env:Path -notlike "*$wingetLinks*")) {
-    $env:Path = "$wingetLinks;$env:Path"
+if (Test-Path $wingetLinks) {
+    Add-PathEntry $wingetLinks
 }
 
 # GNU Emacs installs into a versioned directory (for example
@@ -25,8 +24,8 @@ if (Test-Path $emacsRoot) {
         Sort-Object { [version]($_.Name -replace '^emacs-', '') } -Descending |
         Select-Object -First 1 |
         ForEach-Object { Join-Path $_.FullName 'bin' }
-    if ($emacsBin -and (Test-Path (Join-Path $emacsBin 'emacs.exe')) -and ($env:Path -notlike "*$emacsBin*")) {
-        $env:Path = "$emacsBin;$env:Path"
+    if ($emacsBin -and (Test-Path (Join-Path $emacsBin 'emacs.exe'))) {
+        Add-PathEntry $emacsBin
     }
 }
 
