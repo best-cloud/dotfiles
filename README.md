@@ -445,8 +445,12 @@ ELPA snippet from the develop section of
 <https://mirrors.tuna.tsinghua.edu.cn/help/elpa/>. It sets
 `configuration-layer-elpa-archives` to the `melpa-cn`, `org-cn` and `gnu-cn`
 mirrors, plus `nongnu-cn` because Spacemacs' lock file also uses NonGNU ELPA
-and the org layer needs `org-contrib` from it. The GUI default
-font is JetBrainsMono NF at 12 pt medium weight, and
+and the org layer needs `org-contrib` from it. `org-cn` is kept to match the
+published snippet even though TUNA's org mirror currently serves the
+orgmode.org website and its `archive-contents` returns 404; the startup warning
+is harmless until the mirror is fixed. macOS also installs `gnu-tar`
+(Homebrew's `gtar`) because quelpa prefers it over the system BSD tar. The GUI
+default font is JetBrainsMono NF at 12 pt medium weight, and
 the mode-line theme uses `:separator-scale 1.1` to match the managed WezTerm
 profile. The first Emacs start downloads Spacemacs packages through the mirror,
 so it needs network access once. Edit the repo copy rather than `~/.spacemacs`;
@@ -468,6 +472,9 @@ on save:
 - The other languages have no on-save formatter and no formatter wiring in
   `dotspacemacs/user-config`. `prettier` and `shfmt` are still installed by the
   package scripts, but only as CLI tools; Spacemacs does not call them.
+- `dotspacemacs/user-init` adds the Homebrew directories to `exec-path` before
+  packages load, so quelpa uses `gtar` instead of macOS' BSD tar; BSD tar adds
+  AppleDouble `._*` members that break the `code-review` build.
 - `dotspacemacs/user-config` adds `~/.local/bin`, the Homebrew directories on
   macOS and the WinGet/npm directories on Windows to `exec-path`, so GUI Emacs
   finds `ruff` and `opencode`.

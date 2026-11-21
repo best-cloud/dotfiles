@@ -57,6 +57,10 @@ agents otherwise get wrong.
   not packaged by apt (only the `python3-ollama` client library), so the Linux
   branch installs it with the upstream `https://ollama.com/install.sh` script.
   It is also not installed natively on Windows: use the WSL2 Ollama.
+  `gnu-tar` is the macOS-only exception: quelpa/package-build prefer `gtar`
+  over the system BSD tar, which adds AppleDouble `._*` members that break
+  Emacs' `package-tar-file-info` when building the code-review package; Linux
+  already ships GNU tar and Windows gets it from Git for Windows.
 - Desktop-only extras are intentional: WeChat DevTools and Postman are
   development tools installed on macOS (`postman`, `wechatwebdevtools` casks)
   and Windows (`Postman.Postman`, `Tencent.WeixinDevTools`), not on Linux. The
@@ -111,8 +115,16 @@ agents otherwise get wrong.
   `configuration-layer-elpa-archives` (single dash), not the master-only
   double-dash name. Keep the published snippet format, but it omits NonGNU
   ELPA, which Spacemacs' lock file uses for `org-contrib`, so `nongnu-cn` is
-  added as a fourth archive; removing it brings back "Package org-contrib is
-  not available". The default GUI font
+  added; removing it brings back "Package org-contrib is not available".
+  `org-cn` stays in the list to match the published snippet, even though
+  TUNA's `elpa/org/` currently serves the orgmode.org website and its
+  `archive-contents` returns 404; the resulting startup warning is expected
+  until TUNA fixes the mirror. On macOS `user-init()` puts Homebrew's bin
+  directory on `exec-path` before packages load, so quelpa finds `gtar`
+  (installed from the Homebrew list) instead of the system BSD tar. BSD tar
+  adds AppleDouble `._*` members that Emacs 31's `tar-mode` exposes, breaking
+  quelpa's `code-review` build with "wrong-type-argument arrayp nil". The
+  default GUI font
   is JetBrainsMono NF 12 pt medium; the mode-line height uses
   `:separator-scale 1.1`.
 - The deb822 TUNA apt-mirror logic exists twice: in `bootstrap.sh` (so the

@@ -308,8 +308,15 @@ ollama
 fnm
 shfmt
 diffutils
+gnu-tar
 wget
 "
+
+# gnu-tar is macOS-only: quelpa/package-build prefer `gtar` over the system
+# BSD tar, which adds AppleDouble `._*` members that break Emacs'
+# `package-tar-file-info` when building the code-review package. Linux already
+# ships GNU tar and Windows gets it from Git for Windows, so it stays out of
+# those lists.
 
 missing=""
 for pkg in $BREW_PACKAGES; do

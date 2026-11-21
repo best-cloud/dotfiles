@@ -573,9 +573,21 @@ This function is called immediately after `dotspacemacs/init', before layer
 configuration.
 It is mostly for variables that should be set before packages are loaded.
 If you are unsure, try setting them in `dotspacemacs/user-config' first."
+  ;; quelpa prefers GNU tar (`gtar') over macOS' BSD tar. BSD tar adds
+  ;; AppleDouble `._*' members for extended attributes; Emacs 31's tar-mode
+  ;; exposes them, so `package-tar-file-info' mistakes `._code-review' for
+  ;; the package root and the git layer's code-review build fails. Homebrew
+  ;; installs gnu-tar as `gtar'; put it on `exec-path' before quelpa loads.
+  (when (eq system-type 'darwin)
+    (dolist (dir '("/opt/homebrew/bin" "/usr/local/bin"))
+      (add-to-list 'exec-path dir)))
+
   ;; TUNA develop-branch snippet from
   ;; https://mirrors.tuna.tsinghua.edu.cn/help/elpa/ with NonGNU ELPA added:
   ;; Spacemacs' lock file uses it and the org layer needs `org-contrib' from it.
+  ;; `org-cn' is kept to match the published snippet even though TUNA's org
+  ;; mirror currently serves the orgmode.org website (`archive-contents' returns
+  ;; 404). Spacemacs logs a harmless download warning until the mirror is fixed.
   (setq configuration-layer-elpa-archives
     '(("melpa-cn"  . "https://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
       ("org-cn"    . "https://mirrors.tuna.tsinghua.edu.cn/elpa/org/")
