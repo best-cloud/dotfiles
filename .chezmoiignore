@@ -29,7 +29,9 @@ Documents/**
 
 # Unix-only targets. Neovim and Zellij are kept because the Windows profile
 # sets XDG_CONFIG_HOME (and ZELLIJ_CONFIG_DIR), so they read ~/.config on
-# Windows as well.
+# Windows as well. uv does not: it reads %APPDATA%\uv\uv.toml on Windows, which
+# is managed as AppData/Roaming/uv/uv.toml instead.
 {{ if eq .chezmoi.os "windows" -}}
 .config/fish/**
+.config/uv/**
 {{ end -}}

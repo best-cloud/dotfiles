@@ -186,6 +186,15 @@ this file only records what agents otherwise get wrong.
   inlines it so prerequisites are fast before chezmoi exists. Only
   `/etc/apt/sources.list.d/ubuntu.sources` is written; the repo targets the
   current Ubuntu LTS, so there is no legacy `sources.list` branch.
+- PyPI and Homebrew use TUNA as well. `dot_config/uv/uv.toml` (Unix) and
+  `AppData/Roaming/uv/uv.toml` (Windows; uv reads `%APPDATA%` and ignores
+  XDG, so `.config/uv/**` is ignored on Windows) must stay identical apart from
+  their comments, and the Linux `ruff` fallback exports `UV_DEFAULT_INDEX`
+  because `before_` scripts run before those targets are applied. The macOS
+  install branch exports `HOMEBREW_API_DOMAIN` and `HOMEBREW_BOTTLE_DOMAIN`
+  from `homebrew-bottles`, and the macOS fish block sets both for interactive
+  shells. Do not add `HOMEBREW_BREW_GIT_REMOTE`/`HOMEBREW_CORE_GIT_REMOTE`: brew
+  4+ installs from the API, so the two variables above are enough.
 - Prefer template data (`.name`, `.email`, `.editor`, `.isWSL`, `.isMacOS`,
   `.isWindows`) over per-OS duplicate files.
 

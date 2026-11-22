@@ -1,0 +1,8 @@
+# Managed by chezmoi. uv on Windows reads %APPDATA%\uv\uv.toml and ignores
+# XDG_CONFIG_HOME, so this is the Windows copy of dot_config/uv/uv.toml. uv
+# resolves packages through the TUNA PyPI mirror, the same mirror the apt and
+# ELPA setup targets. To use pypi.org directly for one command, set
+# UV_DEFAULT_INDEX=https://pypi.org/simple in that shell.
+[[index]]
+url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"
+default = true

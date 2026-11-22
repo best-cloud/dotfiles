@@ -323,6 +323,26 @@ TUNA may lag behind the official security archive by a few minutes; switch the
 security suite back to `http://security.ubuntu.com/ubuntu` in the script if a
 production machine needs immediate security updates.
 
+## PyPI and Homebrew mirrors (TUNA)
+
+The same TUNA mirror serves the package managers that are not managed by apt:
+
+- **uv / PyPI** — `dot_config/uv/uv.toml` (Unix) and
+  `AppData/Roaming/uv/uv.toml` (Windows, because uv ignores XDG there) set
+  `https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple` as the default index.
+  This covers `uv tool install` (ruff, yt-dlp) and `uv pip`. The Linux branch
+  of the package script also exports `UV_DEFAULT_INDEX` for the `ruff` install,
+  because `run_onchange_before_` scripts run before the config file is applied.
+  Set `UV_DEFAULT_INDEX=https://pypi.org/simple` to bypass the mirror for one
+  command.
+- **Homebrew** — the macOS branch exports `HOMEBREW_API_DOMAIN`
+  (`https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api`) and
+  `HOMEBREW_BOTTLE_DOMAIN`
+  (`https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles`), and the macOS fish
+  block sets them for interactive shells. Formula metadata and bottles
+  therefore come from TUNA instead of GitHub.
+- **Node.js** — covered in [Node.js, prettier and linters](#nodejs-prettier-and-linters).
+
 ## Repository layout
 
 ```text
@@ -349,11 +369,13 @@ production machine needs immediate security updates.
 │   ├── zellij/config.kdl               # shared; Windows uses ZELLIJ_CONFIG_DIR
 │   ├── nvim/init.lua                   # plugin-free, works offline
 │   ├── yt-dlp/config                   # optional yt-dlp/Deno/archive settings
+│   ├── uv/uv.toml                      # TUNA PyPI index for uv (Unix)
 │   ├── wezterm/wezterm.lua             # WezTerm (alternative), WSL2 Ubuntu only
 │   └── ghostty/config                  # macOS terminal
 ├── AppData/
-│   └── Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/
-│       └── LocalState/settings.json    # Windows Terminal, Catppuccin Mocha
+│   ├── Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/
+│   │   └── LocalState/settings.json    # Windows Terminal, Catppuccin Mocha
+│   └── Roaming/uv/uv.toml              # TUNA PyPI index for uv (Windows)
 ├── Documents/
 │   ├── PowerShell/
 │   │   └── Microsoft.PowerShell_profile.ps1.tmpl   # PowerShell 7

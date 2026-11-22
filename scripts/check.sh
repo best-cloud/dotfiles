@@ -161,6 +161,8 @@ check_json "$ROOT/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe
 check_lua "$ROOT/dot_config/nvim/init.lua"
 check_lua "$ROOT/dot_config/wezterm/wezterm.lua"
 check_toml "$ROOT/dot_config/starship.toml"
+check_toml "$ROOT/dot_config/uv/uv.toml"
+check_toml "$ROOT/AppData/Roaming/uv/uv.toml"
 
 # The rendered Git config is valid when git can parse it.
 if need git; then

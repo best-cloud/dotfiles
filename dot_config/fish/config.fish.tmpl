@@ -16,6 +16,10 @@ if test -x /opt/homebrew/bin/brew
 else if test -x /usr/local/bin/brew
     eval (/usr/local/bin/brew shellenv)
 end
+# Homebrew fetches formula metadata and bottles from GitHub by default. Use the
+# TUNA mirror, the same one the apt and ELPA setup targets.
+set -gx HOMEBREW_API_DOMAIN https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api
+set -gx HOMEBREW_BOTTLE_DOMAIN https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles
 {{ end -}}
 
 # ---------------------------------------------------------------------------
