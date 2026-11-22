@@ -106,7 +106,10 @@ fi
 
 # Fall back to the upstream installer only for tools that this Ubuntu release
 # does not package. Downloads are best-effort so a transient network error does
-# not block the rest of the dotfiles from being applied.
+# not block the rest of the dotfiles from being applied. Required tools are
+# verified afterwards, though: this is a hash-gated `run_onchange_` script, so a
+# swallowed failure would be recorded as a successful run and never retried.
+missing=""
 for pkg in $unavailable; do
     case "$pkg" in
     starship)
@@ -190,6 +193,13 @@ for pkg in $unavailable; do
             # launched from it, so force POSIX sh syntax here.
             eval "$(fnm env --shell bash)"
             hash -r 2>/dev/null || true
+            if ! has node; then
+                echo "warning: Node.js is still missing after fnm install --lts" >&2
+                missing="$missing node"
+            fi
+        else
+            echo "warning: fnm is unavailable; Node.js was not installed" >&2
+            missing="$missing fnm"
         fi
         ;;
     prettier)
@@ -197,10 +207,13 @@ for pkg in $unavailable; do
         has prettier && continue
         if has npm; then
             echo "==> installing prettier (npm, user prefix)"
-            npm install -g --prefix "$HOME/.local" prettier ||
+            if ! npm install -g --prefix "$HOME/.local" prettier; then
                 echo "warning: prettier installation failed" >&2
+                missing="$missing prettier"
+            fi
         else
             echo "warning: prettier needs npm from fnm; skipping prettier" >&2
+            missing="$missing prettier"
         fi
         ;;
     *)
@@ -215,11 +228,14 @@ done
 if has npm; then
     if ! has cdk; then
         echo "==> installing AWS CDK (npm, user prefix)"
-        npm install -g --prefix "$HOME/.local" aws-cdk ||
+        if ! npm install -g --prefix "$HOME/.local" aws-cdk; then
             echo "warning: AWS CDK installation failed" >&2
+            missing="$missing aws-cdk"
+        fi
     fi
 elif ! has cdk; then
     echo "warning: AWS CDK needs npm from fnm; skipping AWS CDK" >&2
+    missing="$missing aws-cdk"
 fi
 
 # Ubuntu 26.04 packages Starship 1.22.1, which predates jj_bookmark and prints
@@ -234,6 +250,13 @@ if has starship; then
             sh -y -b "$HOME/.local/bin"
         hash -r 2>/dev/null || true
     fi
+fi
+
+if [ -n "$missing" ]; then
+    echo "error: still missing after this run:$missing" >&2
+    echo "       fix the cause (network, proxy or mirror) and run chezmoi apply again;" >&2
+    echo "       the failure keeps this script scheduled to re-run." >&2
+    exit 1
 fi
 
 echo "==> Linux packages complete"
@@ -331,6 +354,10 @@ brew_install_missing cask $BREW_CASKS
 # project `.node-version` is how versions are switched. The `node` and
 # `prettier` formulae are deliberately absent from BREW_PACKAGES because the
 # `prettier` formula would pull Node.js back in as a dependency.
+# This script is hash-gated, so verify the required tools afterwards and fail
+# the apply when they are missing; otherwise chezmoi records the failure as a
+# successful run and never retries it.
+missing=""
 if command -v fnm >/dev/null 2>&1; then
     echo "==> installing Node.js LTS with fnm (not with Homebrew)"
     fnm install --lts ||
@@ -342,24 +369,42 @@ if command -v fnm >/dev/null 2>&1; then
     eval "$(fnm env --shell bash)"
     hash -r 2>/dev/null || true
 
+    if ! command -v node >/dev/null 2>&1; then
+        echo "warning: Node.js is still missing after fnm install --lts" >&2
+        missing="$missing node"
+    fi
+
     if command -v npm >/dev/null 2>&1; then
         if ! command -v prettier >/dev/null 2>&1; then
             echo "==> installing prettier (npm, user prefix)"
             mkdir -p "$HOME/.local/bin"
-            npm install -g --prefix "$HOME/.local" prettier ||
+            if ! npm install -g --prefix "$HOME/.local" prettier; then
                 echo "warning: prettier installation failed" >&2
+                missing="$missing prettier"
+            fi
         fi
         if ! command -v cdk >/dev/null 2>&1; then
             echo "==> installing AWS CDK (npm, user prefix)"
             mkdir -p "$HOME/.local/bin"
-            npm install -g --prefix "$HOME/.local" aws-cdk ||
+            if ! npm install -g --prefix "$HOME/.local" aws-cdk; then
                 echo "warning: AWS CDK installation failed" >&2
+                missing="$missing aws-cdk"
+            fi
         fi
     else
         echo "warning: npm was not found; prettier and aws-cdk were not installed" >&2
+        missing="$missing prettier aws-cdk"
     fi
 else
     echo "warning: fnm is unavailable; Node.js, prettier and aws-cdk were not installed" >&2
+    missing="$missing fnm"
+fi
+
+if [ -n "$missing" ]; then
+    echo "error: still missing after this run:$missing" >&2
+    echo "       fix the cause (network, proxy or mirror) and run chezmoi apply again;" >&2
+    echo "       the failure keeps this script scheduled to re-run." >&2
+    exit 1
 fi
 
 echo "==> macOS packages complete"

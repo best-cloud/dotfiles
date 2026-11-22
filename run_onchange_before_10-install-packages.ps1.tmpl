@@ -70,6 +70,13 @@ $fnmCmd = @(
     (Get-Command fnm.exe -ErrorAction SilentlyContinue).Source
 ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 
+# This script is hash-gated: chezmoi records it as done and only re-runs it when
+# the rendered content changes, or when the previous run failed. Individual
+# failures below stay warnings so the rest of the list is still attempted, but
+# the required tools are verified afterwards and the script exits non-zero when
+# they are missing, so chezmoi reports the failure and retries on the next apply
+# instead of recording a partially applied machine as complete.
+$missing = @()
 if ($fnmCmd) {
     Write-Host 'installing: Node.js LTS (fnm)'
     & $fnmCmd install --lts
@@ -81,9 +88,17 @@ if ($fnmCmd) {
         Write-Warning 'fnm default lts-latest failed'
     }
     # Put the default Node.js and npm on PATH for the npm installs below.
-    & $fnmCmd env --use-on-cd --shell powershell | Out-String | Invoke-Expression
+    $fnmEnv = & $fnmCmd env --use-on-cd --shell powershell | Out-String
+    if ($fnmEnv -and $LASTEXITCODE -eq 0) {
+        $fnmEnv | Invoke-Expression
+    }
+    if (-not (Get-Command node.exe -ErrorAction SilentlyContinue)) {
+        Write-Warning 'Node.js is still missing after fnm install --lts'
+        $missing += 'node'
+    }
 } else {
     Write-Warning 'fnm was not found; Node.js, npm and aws-cdk were not installed'
+    $missing += 'fnm'
 }
 
 # npm global packages go under %APPDATA%\npm (the conventional Windows prefix;
@@ -98,6 +113,9 @@ if ($npmCmd) {
         if ($LASTEXITCODE -ne 0) {
             Write-Warning 'prettier installation failed'
         }
+        if (-not (Test-Path (Join-Path $npmBin 'prettier.cmd'))) {
+            $missing += 'prettier'
+        }
     }
     if (-not (Test-Path (Join-Path $npmBin 'cdk.cmd'))) {
         Write-Host 'installing: AWS CDK (npm)'
@@ -105,10 +123,21 @@ if ($npmCmd) {
         if ($LASTEXITCODE -ne 0) {
             Write-Warning 'AWS CDK installation failed'
         }
+        if (-not (Test-Path (Join-Path $npmBin 'cdk.cmd'))) {
+            $missing += 'aws-cdk'
+        }
     }
 } else {
     Write-Warning 'npm was not found; prettier and aws-cdk were not installed'
+    $missing += 'prettier', 'aws-cdk'
 }
 
 Write-Host 'Windows packages complete. Open a new terminal to pick up PATH changes.'
+
+if ($missing.Count -gt 0) {
+    Write-Warning "Still missing after this run: $($missing -join ', ')."
+    Write-Warning 'Fix the cause (network, proxy or mirror) and run chezmoi apply again.'
+    Write-Warning 'The failure keeps this script scheduled to re-run.'
+    exit 1
+}
 {{ end -}}

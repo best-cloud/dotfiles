@@ -373,6 +373,12 @@ and re-runs a script only when it changes. Add a package to a list, run
 `chezmoi apply`, and it installs just that package (all scripts are
 idempotent).
 
+Individual downloads stay best-effort so one failure does not block the rest of
+the list. The tools with no distro package (Node.js from fnm, prettier, AWS CDK)
+are verified at the end of the package script, though: when one is still missing
+the script exits non-zero, `chezmoi apply` reports the error, and chezmoi re-runs
+the script on the next apply instead of recording a partial install as done.
+
 The scripts are templates too. On the wrong OS a script renders to whitespace,
 and chezmoi skips whitespace-only scripts entirely. That is why a `.ps1`
 script is safe in the same repo as Linux/macOS `.sh` scripts.
@@ -768,12 +774,16 @@ chezmoi verify
   `~/.local/bin`; if the warning persists, check that `command -v starship`
   resolves to `~/.local/bin/starship` and re-run `chezmoi apply`.
 - **`node`/`npm` are missing or the wrong version** — Node.js comes from fnm on
-  every platform. Run `fnm list`, `fnm install --lts` and
-  `fnm default lts-latest`, then open a new shell (`fnm env --use-on-cd` is
-  sourced by fish and by the PowerShell profile). If a machine previously
-  installed Node.js with apt, Homebrew or winget, remove it (`sudo apt-get
-  remove nodejs npm`, `brew uninstall node prettier`, or `winget uninstall
-  OpenJS.NodeJS.LTS`) so the fnm version wins.
+  every platform. When the fnm download does not succeed, `chezmoi apply` ends
+  with `still missing after this run: node` and the install script is re-run on
+  the next apply. Fix the network (behind a firewall, set
+  `FNM_NODE_DIST_MIRROR=https://registry.npmmirror.com/-/binary/node/`) or run
+  `fnm list`, `fnm install --lts` and `fnm default lts-latest` by hand, then
+  open a new shell (`fnm env --use-on-cd` is sourced by fish and by the
+  PowerShell profile). If a machine previously installed Node.js with apt,
+  Homebrew or winget, remove it (`sudo apt-get remove nodejs npm`,
+  `brew uninstall node prettier`, or `winget uninstall OpenJS.NodeJS.LTS`) so
+  the fnm version wins.
 - **`yt-dlp` warns that no JavaScript runtime is available** — the optional
   apps install Deno, and `~/.config/yt-dlp/config` sets `--js-runtimes deno`.
   Check `deno --version`; on Linux the official installer puts it in

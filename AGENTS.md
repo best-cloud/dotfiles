@@ -46,6 +46,12 @@ this file only records what agents otherwise get wrong.
   the apply phase.
 - Any rendered byte change in a `run_onchange_` script (even a comment) makes
   chezmoi re-run it on the next apply. Don't edit them casually on a live box.
+- A `run_onchange_` script that exits 0 is recorded as done even when a
+  download failed, so the package scripts verify the tools they are
+  responsible for at the end (Node.js after fnm, prettier, AWS CDK) and exit
+  non-zero when one is still missing. chezmoi then reports the failure and
+  re-runs the script on the next apply. Individual install failures stay
+  warnings so the rest of the list is still attempted.
 - Adding software means editing the `run_onchange_` install scripts, not
   `bootstrap.*`; bootstrap only installs chezmoi and calls `chezmoi init`.
 - `bootstrap.sh` and `bootstrap.ps1` are generated from `bootstrap.*.tmpl` by
