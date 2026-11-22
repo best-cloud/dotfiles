@@ -60,6 +60,12 @@ set -gx VISUAL {{ .editor | quote }}
 set -gx PAGER less
 set -gx LESS -R
 
+# AWS CDK uses Podman on hosts without Docker. Podman is in the Linux and
+# macOS package lists; Windows uses the WSL2 distribution instead.
+if type -q podman
+    set -gx CDK_DOCKER podman
+end
+
 # Use the real binary name here: MANPAGER runs under sh, where fish functions
 # (such as the Debian `bat` wrapper above) are not available.
 if type -q batcat
