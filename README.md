@@ -55,8 +55,8 @@ chezmoi itself comes from Homebrew or winget where available, and from its
 official installer on Linux (apt does not package it). Both bootstraps install
 Git first when it is missing (plus `curl` on minimal Linux images), because the
 first `chezmoi init` clones this repository with git. On first run you are
-prompted once for your name and email (used by Git); those answers are stored
-in `~/.config/chezmoi/chezmoi.toml`.
+prompted once for your name and email (used by Git) and whether to install the
+optional apps; those answers are stored in `~/.config/chezmoi/chezmoi.toml`.
 
 The generated config also records `sourceDir`. Without that, a bootstrap from a
 local checkout would leave later `chezmoi apply`/`chezmoi status` calls looking
@@ -95,23 +95,28 @@ GitHub (SSH key or `gh auth login`), or pass an SSH URL through
 | Editors / multiplexers | neovim, emacs, zellij | neovim, emacs, zellij | Neovim, Emacs, Zellij |
 | Dev tools | gh, direnv, uv, AWS CLI, AWS CDK, lazygit, mosh | gh, direnv, uv, AWS CLI, AWS CDK, lazygit, mosh, WeChat DevTools, Postman | gh, uv, AWS CLI, AWS CDK, lazygit, WeChat DevTools, Postman (mosh via WSL) |
 | Containers | podman | podman | — |
-| Node.js | fnm + Node.js LTS (no apt) | fnm + Node.js LTS (no Homebrew) | fnm + Node.js LTS (winget) |
+| Node.js | fnm (upstream installer) + Node.js LTS | fnm (Homebrew) + Node.js LTS | fnm (winget) + Node.js LTS |
 | AI / Python tooling | opencode, ruff, ollama | opencode, ruff, ollama | OpenCode, Ruff (ollama via WSL) |
 | Formatters / linters | prettier, shfmt, shellcheck | prettier, shfmt, shellcheck | Prettier, shfmt, ShellCheck |
 | Optional daily-use apps | see below (CLI tools) | see below | see below |
 | Terminal | — (client terminal) | Ghostty | Windows Terminal, WezTerm |
-| Remote access | openssh-server (WSL sshd on 2222), mosh | mosh | Windows OpenSSH Server (port 22), firewall for WSL 2222 + mosh |
+| Remote access | openssh-server (Ubuntu Server 22, WSL 2222), mosh | mosh | Windows OpenSSH Server (22), firewall for 22 + WSL 2222/mosh |
 | WSL2 / Ubuntu | — (native) | — | Microsoft.WSL + latest Ubuntu LTS |
 | Terminal font | — (client terminal) | JetBrainsMono Nerd Font | JetBrainsMono Nerd Font |
 | Editor config | Spacemacs in `~/.emacs.d` | Spacemacs in `~/.emacs.d` | Spacemacs in `%USERPROFILE%\.emacs.d` |
 
-Ubuntu releases do not all package `starship`, `zellij`, `uv` and `ruff`, and
-never package `fnm` or `prettier`. The script checks apt first and only then
-falls back to the official installer (the GitHub release binary for zellij,
-`uv tool install` for ruff, the upstream installer for fnm, npm for prettier).
-`eza` and `lazygit` are installed from apt when the release provides them;
-otherwise the script prints a warning and continues, and the shell config still
-works without them.
+Node.js is always installed by fnm, and prettier and AWS CDK by npm, even where
+the table's package-manager column is apt, Homebrew or winget. On Windows, the
+OpenSSH Server is a Windows capability rather than a winget package.
+
+The Linux install script always checks apt first. If the release does not
+package a tool, it falls back to the upstream installer: `starship`, `uv` and
+`fnm` use their install scripts, zellij uses the GitHub release binary, `ruff`
+uses `uv tool install`, and prettier uses npm. Ollama and OpenCode are not
+packaged by apt at all, so they use their upstream installers. `eza` and
+`lazygit` are installed from apt when the release provides them; otherwise the
+script prints a warning and continues, and the shell config still works without
+them.
 
 `bsdextrautils` is a Linux-only dependency: it provides `col`, which the fish
 `MANPAGER` pipeline uses to strip overstrike codes before `bat` renders a man
@@ -210,7 +215,7 @@ in `PATH`, so the newer binary shadows `/usr/bin/starship`.
 
 ### Node.js, prettier and linters
 
-Node.js is never installed by apt or Homebrew. Every platform uses
+Node.js is never installed by apt, Homebrew or winget. Every platform uses
 [fnm](https://github.com/Schniz/fnm): the Linux script installs it with the
 upstream installer into `~/.local/share/fnm` (`--skip-shell`, so the installer
 does not edit shell rc files), macOS installs `fnm` from Homebrew, and Windows
@@ -243,7 +248,8 @@ Windows shim.
 Every platform can also install a personal set of optional applications. They
 are opt-in because not every machine wants them: `chezmoi init` asks once and
 defaults to no, and the answer is stored as `installOptionalApps` in
-`~/.config/chezmoi/chezmoi.toml`. At the prompt, enter `y` (or `yes`/`true`) to
+`~/.config/chezmoi/chezmoi.toml`. At the
+`Install optional apps ... [y/N]` prompt, enter `y` (or `yes`/`true`) to
 install the list, or `n` (or `no`/`false`, or just Enter) to skip it.
 
 - Linux (apt + uv + upstream installers): `ffmpeg`, `deno`, `yt-dlp`.
@@ -313,7 +319,7 @@ production machine needs immediate security updates.
 
 ```text
 .
-├── .chezmoi.toml.tmpl                  # machine data + prompts (sourceDir, name, email, isWSL)
+├── .chezmoi.toml.tmpl                  # machine data + prompts (sourceDir, name, email, optional apps, OS flags)
 ├── .chezmoiignore                      # OS-specific and repo-only targets
 ├── .editorconfig                       # whitespace/indentation rules
 ├── .gitattributes                      # line-ending rules
@@ -352,7 +358,7 @@ production machine needs immediate security updates.
 ├── run_onchange_after_20-macos-defaults.sh.tmpl       # .DS_Store off NAS/USB
 ├── run_onchange_after_30-spacemacs.sh.tmpl            # clone Spacemacs (Unix)
 ├── run_onchange_after_30-spacemacs.ps1.tmpl           # clone Spacemacs (Windows)
-├── run_onchange_after_35-windows-ssh.ps1.tmpl         # Windows OpenSSH on port 22
+├── run_onchange_after_35-windows-ssh.ps1.tmpl         # Windows OpenSSH on 22, pwsh 7
 ├── run_onchange_after_40-wsl.ps1.tmpl                 # WSL2 + Ubuntu + firewall
 ├── run_onchange_after_45-wsl-ssh.sh.tmpl              # WSL2 sshd on port 2222
 ├── run_onchange_after_50-optional-apps.sh.tmpl        # optional macOS apps
@@ -448,8 +454,8 @@ genuinely differ.
 
 `dot_config/fish/config.fish.tmpl` is the only managed fish file. It:
 
-- adds `~/.local/bin`, `~/.cargo/bin`, `~/.deno/bin` and (on Linux)
-  `~/.local/share/fnm` to `PATH`;
+- adds `~/.local/bin`, `~/.cargo/bin`, `~/.opencode/bin` and `~/.deno/bin`,
+  plus `~/.local/share/fnm` on Linux, to `PATH`;
 - loads Homebrew's `shellenv` on macOS only;
 - initializes fnm (`fnm env --use-on-cd`) when it is installed;
 - defines `fd`/`bat` wrappers for Ubuntu's `fdfind`/`batcat` names;
@@ -458,9 +464,9 @@ genuinely differ.
   `e` → `emacs -nw`, `zj` → zellij, `o` → opencode, …);
 - sources `~/.config/fish/local.fish` if it exists for machine-local tweaks.
 
-The PowerShell 7 profile defines the same aliases and abbreviations, so both
-shells behave the same way on Windows. The 5.1 shim inherits everything by
-dot-sourcing that profile.
+The PowerShell 7 profile defines the same aliases and abbreviations as the fish
+config, so the two shells stay consistent across platforms. The 5.1 shim
+inherits everything by dot-sourcing that profile.
 
 `run_onchange_after_20-default-shell.sh.tmpl` adds the fish path to
 `/etc/shells` when needed and runs `chsh`. Log out and back in (or run
@@ -468,10 +474,10 @@ dot-sourcing that profile.
 
 The Starship config is the `catppuccin-powerline` preset, so the prompt uses
 Nerd Font glyphs and powerline separators. Install `JetBrainsMono Nerd Font`
-on the machine that renders the terminal (Windows and macOS runtimes do this
-automatically); the managed WezTerm and Ghostty configs already select it. If
-you only have a bare TTY or a terminal without a Nerd Font, regenerate the file
-with a fallback preset instead:
+on the machine that renders the terminal (the Windows and macOS package scripts
+do this automatically); the managed WezTerm and Ghostty configs already select
+it. If you only have a bare TTY or a terminal without a Nerd Font, regenerate
+the file with a fallback preset instead:
 
 ```sh
 starship preset no-nerd-font -o dot_config/starship.toml
@@ -676,6 +682,7 @@ The template data lives in `.chezmoi.toml.tmpl`:
     name = "..."
     email = "..."
     editor = "nvim"
+    installOptionalApps = false
     isWSL = true
     isMacOS = false
     isWindows = false
@@ -802,8 +809,8 @@ chezmoi verify
   2222` should show the listener, and `systemctl status ssh.socket` should be
   active. The mosh UDP range 60000-61000 must not be blocked by a network
   firewall between the client and Windows.
-- **WSL sshd fails with `Address already in use`** — something else, often
-  Windows' own OpenSSH server or another WSL distribution, already holds port
+- **WSL sshd fails with `Address already in use`** — another WSL distribution,
+  a leftover `sshd`, or a manually re-ported Windows sshd already holds port
   2222. Check with `Get-NetTCPConnection -LocalPort 2222 -State Listen` in
   PowerShell, then move the other listener or change the WSL port in
   `run_onchange_after_45-wsl-ssh.sh.tmpl` and the firewall rules.

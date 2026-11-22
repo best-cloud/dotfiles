@@ -20,7 +20,7 @@ sourceDir = {{ .chezmoi.sourceDir | quote }}
     # always installed by the package scripts; this only adds personal extras.
     # Change it by editing [data] in ~/.config/chezmoi/chezmoi.toml (or delete
     # the key and re-run `chezmoi init`).
-    installOptionalApps = {{ promptBoolOnce . "installOptionalApps" "Install optional apps (yt-dlp, 1Password, Chrome, Notion, ...) - type y to install, n to skip" false }}
+    installOptionalApps = {{ promptBoolOnce . "installOptionalApps" "Install optional apps (yt-dlp, 1Password, Chrome, Notion, ...) [y/N]" false }}
 
     # Detected once at init and available to templates as isWSL, isMacOS and
     # isWindows. .chezmoi.kernel is empty on Windows and macOS, so only read
