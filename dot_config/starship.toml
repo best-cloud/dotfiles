@@ -145,6 +145,13 @@ format = '[[ $symbol( $version) ](fg:crust bg:green)]($style)'
 symbol = ""
 style = "bg:green"
 format = '[[ $symbol( $version)(\(#$virtualenv\)) ](fg:crust bg:green)]($style)'
+# Local override (not part of the preset): ask uv for the interpreter so the
+# version matches the project's .venv, then fall back to PATH.
+python_binary = [
+  ['uv', 'run', '--no-python-downloads', '--no-project', 'python'],
+  'python3',
+  'python',
+]
 
 [docker_context]
 symbol = ""

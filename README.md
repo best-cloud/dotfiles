@@ -337,7 +337,7 @@ production machine needs immediate security updates.
 ├── dot_spacemacs                       # default Spacemacs develop dotfile + TUNA ELPA
 ├── dot_config/
 │   ├── fish/config.fish.tmpl           # single fish config for Ubuntu + macOS
-│   ├── starship.toml                   # catppuccin-powerline preset, all OSes
+│   ├── starship.toml                   # catppuccin-powerline preset + uv python_binary
 │   ├── zellij/config.kdl               # shared; Windows uses ZELLIJ_CONFIG_DIR
 │   ├── nvim/init.lua                   # plugin-free, works offline
 │   ├── yt-dlp/config                   # optional yt-dlp/Deno/archive settings
@@ -488,6 +488,12 @@ To pick up preset changes after a Starship upgrade:
 ```sh
 starship preset catppuccin-powerline -o dot_config/starship.toml
 ```
+
+Regenerating drops the one local override in the file: the `[python]` table sets
+`python_binary` to
+`[['uv', 'run', '--no-python-downloads', '--no-project', 'python'], 'python3', 'python']`
+so the prompt shows the interpreter uv resolves for the current directory and
+still works where uv is not on `PATH`. Re-add it after regenerating.
 
 ## Terminals
 

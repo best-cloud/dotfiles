@@ -271,9 +271,13 @@ this file only records what agents otherwise get wrong.
 
 ## Generated content
 
-- `dot_config/starship.toml` is the verbatim `catppuccin-powerline` preset.
-  Regenerate with `starship preset catppuccin-powerline -o dot_config/starship.toml`
-  instead of hand-editing; the prompt requires the JetBrainsMono NF font.
+- `dot_config/starship.toml` is the `catppuccin-powerline` preset plus one
+  local override: `[python] python_binary` tries
+  `uv run --no-python-downloads --no-project python` and then falls back to
+  `python3`/`python`. Regenerate with
+  `starship preset catppuccin-powerline -o dot_config/starship.toml` instead of
+  hand-editing, then re-add that override; the prompt requires the JetBrainsMono
+  NF font.
 - The `Catppuccin Mocha` scheme and theme in the Windows Terminal settings are
   copied verbatim from <https://github.com/catppuccin/windows-terminal>
   (`mocha.json` and `mochaTheme.json`). Do not retype or reorder those colors;
