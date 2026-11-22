@@ -34,7 +34,9 @@ STARSHIP_MIN_VERSION=1.27.0
 # Tools packaged by every supported Ubuntu release. Optional tools are checked
 # with apt-cache below and installed by their upstream installer if missing.
 # bsdextrautils provides col, which fish's MANPAGER pipeline uses to strip
-# overstrike codes before bat renders a man page.
+# overstrike codes before bat renders a man page. openssh-server provides the
+# WSL2 sshd (configured on port 2222 by run_onchange_after_45-wsl-ssh.sh.tmpl);
+# it is Linux-only because macOS and Windows have their own SSH servers.
 PACKAGES="
 ca-certificates
 curl
@@ -57,6 +59,7 @@ btop
 tmux
 bsdextrautils
 mosh
+openssh-server
 neovim
 emacs
 direnv

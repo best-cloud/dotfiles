@@ -20,6 +20,38 @@ function Get-WslDistros {
         ForEach-Object { $_.Trim() } | Where-Object { $_ })
 }
 
+function Add-WslFirewallRules {
+    # Mirrored networking (the managed .wslconfig) exposes WSL listeners on the
+    # Windows interfaces. Both the host firewall and the Hyper-V firewall filter
+    # that traffic, so each needs an inbound allowance.
+    $rules = @(
+        @{ DisplayName = 'WSL2 SSH (TCP 2222)'; Name = 'WSL2-SSH-2222'; Protocol = 'TCP'; Ports = '2222' }
+        @{ DisplayName = 'WSL2 mosh (UDP 60000-61000)'; Name = 'WSL2-Mosh-UDP'; Protocol = 'UDP'; Ports = '60000-61000' }
+    )
+
+    foreach ($rule in $rules) {
+        if (Get-NetFirewallRule -DisplayName $rule.DisplayName -ErrorAction SilentlyContinue) {
+            Write-Host "already present: $($rule.DisplayName)"
+        } else {
+            New-NetFirewallRule -DisplayName $rule.DisplayName -Direction Inbound `
+                -Action Allow -Profile Any -Protocol $rule.Protocol -LocalPort $rule.Ports | Out-Null
+            Write-Host "created firewall rule: $($rule.DisplayName)"
+        }
+    }
+
+    $vmCreatorId = '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}'
+    foreach ($rule in $rules) {
+        if (Get-NetFirewallHyperVRule -Name $rule.Name -ErrorAction SilentlyContinue) {
+            Write-Host "already present: $($rule.DisplayName) (Hyper-V firewall)"
+        } else {
+            New-NetFirewallHyperVRule -Name $rule.Name -DisplayName $rule.DisplayName `
+                -Direction Inbound -VMCreatorId $vmCreatorId -Protocol $rule.Protocol `
+                -LocalPorts $rule.Ports -Action Allow | Out-Null
+            Write-Host "created firewall rule: $($rule.DisplayName) (Hyper-V firewall)"
+        }
+    }
+}
+
 if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
     Write-Warning 'wsl.exe was not found. Run "wsl --install --no-distribution" from an elevated PowerShell, then re-run chezmoi apply.'
     exit 0
@@ -70,5 +102,19 @@ if ($distros -contains 'Ubuntu') {
     } else {
         Write-Host 'Ubuntu installed. Launch it once to create your Linux user.'
     }
+}
+
+# Allow LAN clients to reach the WSL2 Ubuntu sshd (port 2222) and mosh-server
+# (UDP 60000-61000). The rules need an elevated shell, so warn when chezmoi was
+# started without one instead of failing the rest of the apply.
+if (Test-IsAdmin) {
+    try {
+        Add-WslFirewallRules
+    } catch {
+        Write-Warning "Could not create the WSL firewall rules: $($_.Exception.Message)"
+        Write-Warning 'Launch Ubuntu once, delete the 40-wsl.ps1 entryState key, and re-run chezmoi apply elevated.'
+    }
+} else {
+    Write-Warning 'WSL firewall rules need an elevated PowerShell; re-run chezmoi apply from one.'
 }
 {{ end -}}

@@ -1,7 +1,7 @@
 # dotfiles
 
-chezmoi-managed dotfiles for **Ubuntu Server**, **Ubuntu on WSL2**, **macOS**
-and **Windows 11**.
+chezmoi-managed dotfiles for **Ubuntu 26.04+** (including WSL2), **macOS** and
+**Windows 11 26H2+**.
 
 Design principles:
 
@@ -100,6 +100,7 @@ GitHub (SSH key or `gh auth login`), or pass an SSH URL through
 | Formatters / linters | prettier, shfmt, shellcheck | prettier, shfmt, shellcheck | Prettier, shfmt, ShellCheck |
 | Optional daily-use apps | see below (CLI tools) | see below | see below |
 | Terminal | — (client terminal) | Ghostty | Windows Terminal, WezTerm |
+| Remote access | openssh-server (WSL sshd on 2222), mosh | mosh | Windows OpenSSH Server (port 22), firewall for WSL 2222 + mosh |
 | WSL2 / Ubuntu | — (native) | — | Microsoft.WSL + latest Ubuntu LTS |
 | Terminal font | — (client terminal) | JetBrainsMono Nerd Font | JetBrainsMono Nerd Font |
 | Editor config | Spacemacs in `~/.emacs.d` | Spacemacs in `~/.emacs.d` | Spacemacs in `%USERPROFILE%\.emacs.d` |
@@ -143,6 +144,60 @@ Ollama natively; use `ollama` from the WSL2 Ubuntu distribution instead.
 mosh is installed on both Ubuntu Server and WSL (the same apt package), and on
 macOS. It has no native Windows build or winget package, so on Windows it is
 available through the WSL2 Ubuntu distribution; run it as `wsl mosh <host>`.
+
+### SSH and mosh access
+
+Windows 11 runs the built-in OpenSSH Server on the default **port 22**.
+`run_onchange_after_35-windows-ssh.ps1.tmpl` installs the
+`OpenSSH.Server~~~~0.0.1.0` Windows capability when needed, sets `sshd` to
+start automatically, starts it, and creates a `Windows SSH (TCP 22)` inbound
+firewall rule on the `Any` profile. The capability install and service setup
+need an elevated PowerShell. Connect to the Windows host with:
+
+```sh
+ssh <windows-user>@<windows-lan-ip>
+```
+
+WSL2 Ubuntu separately serves SSH on **port 2222**. The Linux
+package list includes `openssh-server` (Ubuntu Server images already have it),
+and `run_onchange_after_45-wsl-ssh.sh.tmpl` writes
+`/etc/ssh/sshd_config.d/00-chezmoi-wsl.conf` with `Port 2222`. Ubuntu 26.04+
+starts SSH from `ssh.socket`, so the script also writes
+`/etc/systemd/system/ssh.socket.d/zz-chezmoi-port.conf` and restarts
+`ssh.socket` (the `zz-` prefix keeps the override after systemd's generated
+`addresses.conf`). This targets Ubuntu 26.04+ and assumes systemd socket
+activation; if systemd is not running yet, the script writes both files and
+asks for `wsl --shutdown`. The script is a no-op on Ubuntu Server, so a server
+keeps its normal SSH port. Port 2222 avoids colliding with the Windows OpenSSH
+server, which normally owns port 22.
+
+On the Windows side, `dot_wslconfig` sets `networkingMode=mirrored` so WSL2
+shares the Windows host's network interfaces. WSL only reads `.wslconfig` when
+the distribution starts, so run `wsl --shutdown` once after the first apply.
+That restart also starts systemd, which is when the `ssh.socket` drop-in takes
+effect if systemd was not running during the apply. Mirrored networking and the
+Hyper-V firewall are part of the supported Windows 11 26H2+ baseline. The same
+Windows script creates inbound rules for both the Windows Firewall and the
+Hyper-V firewall:
+
+- TCP 2222 for SSH;
+- UDP 60000-61000 for mosh.
+
+Both rule sets use the `Any` profile so they also work on networks classified as
+Public. Creating them needs an elevated shell; a non-elevated apply warns and
+skips them. Once the rules exist, other machines on the LAN can connect with:
+
+```sh
+ssh <windows-user>@<windows-lan-ip>            # Windows sshd, port 22
+ssh -p 2222 <wsl-user>@<windows-lan-ip>        # WSL2 sshd, port 2222
+mosh --ssh='ssh -p 2222' <wsl-user>@<windows-lan-ip>
+```
+
+Windows and WSL2 can be reached at the same LAN address because they listen on
+different ports. mosh uses the WSL SSH connection on port 2222 and then switches
+to its UDP port. Keep Windows on 22 and WSL on 2222; if one side is moved,
+update `run_onchange_after_35-windows-ssh.ps1.tmpl`,
+`run_onchange_after_45-wsl-ssh.sh.tmpl` and the firewall rules together.
 
 Ubuntu 26.04 packages Starship 1.22.1, but the shipped
 `catppuccin-powerline` preset uses `jj_bookmark`, added in Starship 1.27.0.
@@ -269,6 +324,7 @@ production machine needs immediate security updates.
 ├── .github/workflows/ci.yml            # Linux + macOS check job
 ├── dot_gitconfig.tmpl                  # single Git config for all OSes
 ├── dot_gitignore_global
+├── dot_wslconfig                       # Windows-only mirrored WSL networking
 ├── dot_spacemacs                       # default Spacemacs develop dotfile + TUNA ELPA
 ├── dot_config/
 │   ├── fish/config.fish.tmpl           # single fish config for Ubuntu + macOS
@@ -293,7 +349,9 @@ production machine needs immediate security updates.
 ├── run_onchange_after_20-macos-defaults.sh.tmpl       # .DS_Store off NAS/USB
 ├── run_onchange_after_30-spacemacs.sh.tmpl            # clone Spacemacs (Unix)
 ├── run_onchange_after_30-spacemacs.ps1.tmpl           # clone Spacemacs (Windows)
-├── run_onchange_after_40-wsl.ps1.tmpl                 # WSL2 + Ubuntu
+├── run_onchange_after_35-windows-ssh.ps1.tmpl         # Windows OpenSSH on port 22
+├── run_onchange_after_40-wsl.ps1.tmpl                 # WSL2 + Ubuntu + firewall
+├── run_onchange_after_45-wsl-ssh.sh.tmpl              # WSL2 sshd on port 2222
 ├── run_onchange_after_50-optional-apps.sh.tmpl        # optional macOS apps
 ├── run_onchange_after_50-optional-apps-linux.sh.tmpl  # optional Linux CLI apps
 └── run_onchange_after_50-optional-apps.ps1.tmpl       # optional Windows apps
@@ -500,7 +558,8 @@ when that matters.
 - Run `bootstrap.ps1` on Windows itself, not inside WSL, so winget apps and the
   PowerShell profile are applied. If your winget policy requires machine-wide
   installs, run it from an elevated PowerShell; user-scope installs work from a
-  normal window.
+  normal window. The Windows OpenSSH Server capability, service and firewall
+  rule also need an elevated window.
 - The PowerShell 7 profile template is
   `Documents/PowerShell/Microsoft.PowerShell_profile.ps1.tmpl`. Windows
   PowerShell 5.1 uses a different path, so
@@ -525,12 +584,22 @@ when that matters.
   managed settings live under
   `%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState`.
   WezTerm stays installed for WSL-only sessions and opens WSL2 directly.
+- `run_onchange_after_35-windows-ssh.ps1.tmpl` enables the built-in Windows
+  OpenSSH Server on port 22: it installs the `OpenSSH.Server` capability, sets
+  the `sshd` service to Automatic and starts it, and adds a `Windows SSH (TCP
+  22)` inbound firewall rule for the `Any` profile. It needs an elevated shell.
+  WSL2 stays on 2222, so both are reachable at the same LAN address.
 - `run_onchange_after_40-wsl.ps1.tmpl` sets WSL2 as the default version and
   registers the `Ubuntu` distribution when it is missing. The first
   `wsl --install` that enables the optional Windows features needs an elevated
   shell and sometimes a reboot; the script prints the exact command and exits
   cleanly when it is not elevated. Launch Ubuntu once after it is registered to
   create the Linux user.
+- The managed `~/.wslconfig` sets `networkingMode=mirrored`, and the same
+  script creates the Windows Firewall and Hyper-V firewall rules for SSH on TCP
+  2222 and mosh on UDP 60000-61000. Run `wsl --shutdown` after the first apply
+  so WSL picks up the new networking mode; create the rules from an elevated
+  shell.
 - Run `bootstrap.sh` inside the WSL distro as well; the two sides are
   independent chezmoi installations.
 
@@ -711,6 +780,27 @@ chezmoi verify
   PowerShell and possibly a reboot. Run `wsl --install --no-distribution`, reboot
   if asked, then re-run `chezmoi apply` (delete the
   `40-wsl.ps1` `entryState` key to force it).
+- **Cannot reach the Windows host over SSH** — the OpenSSH Server capability
+  and `sshd` setup need an elevated apply. Check `Get-Service sshd`,
+  `Get-WindowsCapability -Online -Name OpenSSH.Server*`, and
+  `Get-NetFirewallRule -DisplayName 'Windows SSH (TCP 22)'`. If the service
+  failed to start because WSL was holding port 22, run `wsl --shutdown` and
+  restart the service.
+- **Cannot reach WSL2 over SSH or mosh from another machine** — check that
+  `~/.wslconfig` contains `networkingMode=mirrored`, run `wsl --shutdown`, and
+  reopen Ubuntu. Confirm the rules exist (`Get-NetFirewallRule -DisplayName
+  'WSL2 *'` and `Get-NetFirewallHyperVRule -Name 'WSL2-*'`). If an earlier
+  non-elevated apply skipped them, delete the `40-wsl.ps1` `entryState` key (see
+  above) and re-run `chezmoi apply` from an elevated shell. Inside Ubuntu,
+  `sudo sshd -T | grep -i '^port'` should report 2222, `sudo ss -lntp | grep
+  2222` should show the listener, and `systemctl status ssh.socket` should be
+  active. The mosh UDP range 60000-61000 must not be blocked by a network
+  firewall between the client and Windows.
+- **WSL sshd fails with `Address already in use`** — something else, often
+  Windows' own OpenSSH server or another WSL distribution, already holds port
+  2222. Check with `Get-NetTCPConnection -LocalPort 2222 -State Listen` in
+  PowerShell, then move the other listener or change the WSL port in
+  `run_onchange_after_45-wsl-ssh.sh.tmpl` and the firewall rules.
 - **Spacemacs did not clone** — check `chezmoi apply` output. A pre-existing
   `~/.emacs.d` that is not a git checkout is intentionally left alone, and the
   clone needs git plus network access. An existing checkout on another branch

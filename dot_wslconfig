@@ -1,0 +1,7 @@
+# Managed by chezmoi: %USERPROFILE%\.wslconfig on Windows.
+# Mirrored networking makes WSL2 share the Windows host's network interfaces,
+# so LAN clients can reach the Ubuntu sshd and mosh-server directly. The
+# inbound firewall rules are created by run_onchange_after_40-wsl.ps1.tmpl.
+# Run `wsl --shutdown` from Windows after this file changes.
+[wsl2]
+networkingMode=mirrored

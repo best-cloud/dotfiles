@@ -1,7 +1,7 @@
 # AGENTS.md
 
-chezmoi dotfiles for Ubuntu/WSL2, macOS and Windows 11. Correctness means
-templates render, the static checks pass and chezmoi is in sync. `scripts/check.sh`
+chezmoi dotfiles for Ubuntu 26.04+/WSL2, macOS and Windows 11 26H2+. Correctness
+means templates render, the static checks pass and chezmoi is in sync. `scripts/check.sh`
 renders the templates and runs the available linters; `.github/workflows/ci.yml`
 runs it on Linux and macOS. README.md documents the design and per-OS behavior;
 this file only records what agents otherwise get wrong.
@@ -55,6 +55,10 @@ this file only records what agents otherwise get wrong.
 
 ## Non-negotiable cross-OS invariants
 
+- Target only Ubuntu 26.04+ and Windows 11 26H2+. Do not add branches or
+  caveats for pre-26.04 Ubuntu or older Windows 11 releases; systemd socket
+  activation, mirrored WSL networking and the Hyper-V firewall are part of the
+  baseline.
 - Each `run_onchange_` script is wrapped in `{{ if eq .chezmoi.os "..." }}` and
   must render to whitespace on other OSes; chezmoi skips whitespace-only
   scripts. Existing files use `-}}` trims so they render completely empty.
@@ -75,6 +79,10 @@ this file only records what agents otherwise get wrong.
   `bsdextrautils` is the Linux-only exception: it provides `col`, which the
   managed fish `MANPAGER` pipeline uses. macOS ships `col` with the base system
   and fish is not managed on Windows, so it has no Homebrew or winget entry.
+  `openssh-server` is the other Linux-only package: it provides the WSL2 sshd,
+  which `run_onchange_after_45-wsl-ssh.sh.tmpl` moves to port 2222. The script
+  exits on non-WSL kernels, so Ubuntu Server keeps port 22; macOS and Windows
+  provide their own SSH servers and need no package entry.
 - Desktop-only extras are intentional: WeChat DevTools and Postman are
   development tools installed on macOS (`postman`, `wechatwebdevtools` casks)
   and Windows (`Postman.Postman`, `Tencent.WeixinDevTools`), not on Linux. The
@@ -196,6 +204,36 @@ this file only records what agents otherwise get wrong.
   `wsl --install --distribution Ubuntu --no-launch`, not by a winget distro
   package, so it always tracks the current LTS. The first enablement needs an
   elevated shell; the script warns instead of failing when it is not elevated.
+- Windows SSH is enabled by `run_onchange_after_35-windows-ssh.ps1.tmpl` from
+  the built-in `OpenSSH.Server~~~~0.0.1.0` capability, not winget: it sets the
+  `sshd` service to Automatic, starts it, and adds a `Windows SSH (TCP 22)`
+  inbound firewall rule on the `Any` profile. Do not add
+  `Microsoft.OpenSSH.Beta` to the winget list. Windows keeps port 22 and WSL2
+  keeps 2222, so both are reachable at the same LAN address. The capability and
+  service setup need elevation; keep the warning when chezmoi is not elevated.
+- `dot_wslconfig` is the Windows-only target `~/.wslconfig` and must stay under
+  the non-Windows branch of `.chezmoiignore`. It sets
+  `networkingMode=mirrored`, which puts the WSL2 distribution on the Windows
+  host's interfaces. WSL reads the file only when a distribution starts, so
+  `wsl --shutdown` is required after it changes. The same 40 script creates
+  inbound Windows Firewall **and** Hyper-V firewall rules for TCP 2222 (SSH)
+  and UDP 60000-61000 (mosh), because mirrored mode is filtered by both. The
+  rules use the `Any` profile; do not remove the elevated-shell warning, and
+  keep the `{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}` WSL VMCreatorId.
+- WSL2 Ubuntu listens on SSH port 2222 so it does not collide with the Windows
+  OpenSSH server on 22. `run_onchange_after_45-wsl-ssh.sh.tmpl` writes
+  `/etc/ssh/sshd_config.d/00-chezmoi-wsl.conf` and
+  `/etc/systemd/system/ssh.socket.d/zz-chezmoi-port.conf`. The repo targets
+  Ubuntu 26.04+, which starts SSH from `ssh.socket`; do not add an
+  `ssh.service` or init-script fallback. Changing only `sshd_config` leaves the
+  listener on 22, so the `zz-` drop-in must sort after the generator's
+  `addresses.conf`, reset `ListenStream=` and set both `0.0.0.0:2222` and
+  `[::]:2222`. The script enables and restarts `ssh.socket`; when systemd is not
+  running yet it only writes the files and asks for `wsl --shutdown`. OpenSSH
+  `Port` options are cumulative, not first-wins, so the script warns when
+  `sshd -T` reports any port other than 2222. Keep the runtime `/proc/version`
+  check so Ubuntu Server is untouched, and keep the firewall port in sync with
+  these drop-ins. Mosh reuses the SSH connection and then uses UDP 60000-61000.
 - On WSL, `bootstrap.sh` idempotently merges `systemd=true` into a `[boot]`
   section of `/etc/wsl.conf` (detected via `/proc/version`) and never overwrites
   the rest of the file. WSL only reads it at distro start, so the restart with

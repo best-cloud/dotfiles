@@ -1,0 +1,127 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/sh
+# WSL2 Ubuntu (26.04+) only: serve SSH on port 2222.
+#
+# Mirrored WSL networking (dot_wslconfig) puts the distribution on the Windows
+# host's network interfaces, so LAN clients can reach sshd and mosh-server
+# directly. Port 2222 avoids colliding with the Windows OpenSSH server, which
+# normally owns port 22. The Windows firewall rules are created by
+# run_onchange_after_40-wsl.ps1.tmpl. Rendered on Linux and exits immediately
+# on Ubuntu Server.
+set -eu
+
+{{ include "scripts/lib/shell.sh" }}
+[ -r /proc/version ] || exit 0
+grep -qi microsoft /proc/version || exit 0
+
+if ! native_cmd sshd; then
+    echo "warning: openssh-server is not installed; skipping the WSL sshd port change" >&2
+    exit 0
+fi
+
+if ! can_root; then
+    echo "warning: sudo is required to change the WSL sshd port; skipping" >&2
+    exit 0
+fi
+
+if ! as_root test -d /etc/ssh/sshd_config.d; then
+    echo "warning: /etc/ssh/sshd_config.d is missing; skipping the WSL sshd port change" >&2
+    exit 0
+fi
+if ! as_root grep -Eq '^[[:space:]]*Include[[:space:]]+/etc/ssh/sshd_config\.d/\*\.conf' /etc/ssh/sshd_config; then
+    echo "warning: /etc/ssh/sshd_config does not include sshd_config.d; skipping the WSL sshd port change" >&2
+    exit 0
+fi
+
+ssh_config=/etc/ssh/sshd_config.d/00-chezmoi-wsl.conf
+socket_config=/etc/systemd/system/ssh.socket.d/zz-chezmoi-port.conf
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+
+# Keep sshd_config in sync too: it documents the port, makes `sshd -T` report
+# 2222, and is the fallback if the daemon is ever started directly.
+{
+    echo '# Managed by chezmoi: expose WSL2 sshd on 2222 (Windows sshd keeps 22).'
+    echo 'Port 2222'
+} >"$tmp"
+
+changed=0
+if [ -f "$ssh_config" ] && as_root cmp -s "$tmp" "$ssh_config"; then
+    :
+else
+    if [ -f "$ssh_config" ] && [ ! -f "${ssh_config}.orig" ]; then
+        as_root cp -a "$ssh_config" "${ssh_config}.orig"
+    fi
+    as_root install -m 0644 "$tmp" "$ssh_config"
+    changed=1
+fi
+
+# Ubuntu 26.04 starts sshd from ssh.socket, and its systemd generator reads
+# sshd_config at daemon-reload time. The zz- prefix sorts after the generated
+# addresses.conf, so the empty ListenStream= resets any 22 from the base unit or
+# generator before the two 2222 listeners are added.
+{
+    echo '# Managed by chezmoi: bind the WSL2 SSH socket to 2222.'
+    echo '[Socket]'
+    echo 'ListenStream='
+    echo 'ListenStream=0.0.0.0:2222'
+    echo 'ListenStream=[::]:2222'
+    echo 'BindIPv6Only=ipv6-only'
+} >"$tmp"
+
+socket_changed=0
+if [ -f "$socket_config" ] && as_root cmp -s "$tmp" "$socket_config"; then
+    :
+else
+    if [ -f "$socket_config" ] && [ ! -f "${socket_config}.orig" ]; then
+        as_root cp -a "$socket_config" "${socket_config}.orig"
+    fi
+    as_root install -D -m 0644 "$tmp" "$socket_config"
+    socket_changed=1
+fi
+
+rm -f "$tmp"
+trap - EXIT
+
+if ! as_root sshd -t; then
+    echo "error: sshd rejected $ssh_config; not restarting the service" >&2
+    exit 1
+fi
+
+sshd_ports=$(as_root sshd -T 2>/dev/null | awk '$1 == "port" { print $2 }' | sort -u)
+case "$sshd_ports" in
+2222) ;;
+*)
+    echo "warning: sshd ports are '${sshd_ports:-unknown}', expected only 2222" >&2
+    echo "         remove other Port directives from /etc/ssh/sshd_config*" >&2
+    ;;
+esac
+
+# WSL starts systemd only after `wsl --shutdown` following the bootstrap's
+# /etc/wsl.conf change. Write the files now; the socket picks them up then.
+if [ ! -d /run/systemd/system ]; then
+    if [ "$changed" -eq 1 ] || [ "$socket_changed" -eq 1 ]; then
+        echo "==> WSL2 SSH is configured for port 2222; run 'wsl --shutdown' and reopen Ubuntu to apply it"
+    fi
+    exit 0
+fi
+
+as_root systemctl daemon-reload ||
+    echo "warning: systemctl daemon-reload failed" >&2
+as_root systemctl enable ssh.socket >/dev/null 2>&1 || true
+
+if [ "$changed" -eq 1 ] || [ "$socket_changed" -eq 1 ]; then
+    as_root systemctl restart ssh.socket ||
+        echo "warning: could not restart ssh.socket" >&2
+else
+    as_root systemctl start ssh.socket || true
+fi
+
+if ! as_root ss -ltn 2>/dev/null | awk '{ print $4 }' | grep -Eq '[:.]2222$'; then
+    echo "warning: no SSH listener on 2222; check ssh.socket" >&2
+fi
+
+if [ "$changed" -eq 1 ] || [ "$socket_changed" -eq 1 ]; then
+    echo "==> WSL2 sshd now listens on port 2222 (mosh uses UDP 60000-61000)"
+fi
+{{ end -}}

@@ -1,0 +1,76 @@
+{{ if eq .chezmoi.os "windows" -}}
+# Windows 11 26H2+ only: enable the built-in OpenSSH Server on port 22.
+#
+# WSL2 Ubuntu uses 2222 (see run_onchange_after_45-wsl-ssh.sh.tmpl), so both
+# the Windows host and its WSL distribution are reachable over SSH at the same
+# LAN address with different ports. Rendered empty on other operating systems,
+# so chezmoi skips it there.
+$ErrorActionPreference = 'Continue'
+
+function Test-IsAdmin {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+if (-not (Test-IsAdmin)) {
+    Write-Warning 'Enabling the Windows OpenSSH server needs an elevated PowerShell.'
+    Write-Warning 'Re-run chezmoi apply from one to install the capability, service and firewall rule.'
+    exit 0
+}
+
+$capabilityName = 'OpenSSH.Server~~~~0.0.1.0'
+$capability = Get-WindowsCapability -Online -Name $capabilityName -ErrorAction SilentlyContinue
+if (-not $capability) {
+    Write-Warning "The Windows capability $capabilityName was not found."
+    exit 0
+}
+
+if ($capability.State -eq 'Installed') {
+    Write-Host 'already installed: OpenSSH Server'
+} else {
+    Write-Host '==> installing the Windows OpenSSH Server capability'
+    try {
+        $result = Add-WindowsCapability -Online -Name $capabilityName -ErrorAction Stop
+        if ($result.RestartNeeded) {
+            Write-Warning 'A restart is required to finish enabling OpenSSH Server.'
+        }
+    } catch {
+        Write-Warning "Could not install the OpenSSH Server capability: $($_.Exception.Message)"
+        exit 0
+    }
+}
+
+$sshd = Get-Service -Name sshd -ErrorAction SilentlyContinue
+if (-not $sshd) {
+    Write-Warning 'The sshd service is not available yet; reboot and re-run chezmoi apply.'
+    exit 0
+}
+
+try {
+    Set-Service -Name sshd -StartupType Automatic -ErrorAction Stop
+    if ($sshd.Status -ne 'Running') {
+        Start-Service -Name sshd -ErrorAction Stop
+    }
+    Write-Host 'Windows sshd is running on the default port 22.'
+} catch {
+    Write-Warning "Could not start the Windows sshd service: $($_.Exception.Message)"
+    Write-Warning 'If WSL is holding port 22, run "wsl --shutdown"; WSL sshd must use 2222.'
+}
+
+# The built-in OpenSSH rule is scoped to sshd.exe and normally Private/Domain.
+# Add an explicit Any-profile rule so LAN clients can reach port 22 on Public
+# networks too. The WSL rules live in run_onchange_after_40-wsl.ps1.tmpl.
+$ruleName = 'Windows SSH (TCP 22)'
+if (Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue) {
+    Write-Host "already present: $ruleName"
+} else {
+    try {
+        New-NetFirewallRule -DisplayName $ruleName -Direction Inbound `
+            -Action Allow -Profile Any -Protocol TCP -LocalPort 22 | Out-Null
+        Write-Host "created firewall rule: $ruleName"
+    } catch {
+        Write-Warning "Could not create the Windows SSH firewall rule: $($_.Exception.Message)"
+    }
+}
+{{ end -}}

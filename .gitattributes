@@ -11,6 +11,7 @@
 *.ps1.tmpl text eol=lf
 
 # Generated and hand-written config files are easiest to diff with LF.
+dot_wslconfig text eol=lf
 *.json text eol=lf
 *.kdl text eol=lf
 *.lua text eol=lf

@@ -18,6 +18,7 @@ scripts/**
 {{ if ne .chezmoi.os "windows" -}}
 AppData/**
 Documents/**
+.wslconfig
 .config/wezterm/**
 {{ end -}}
 
