@@ -151,8 +151,11 @@ Windows 11 runs the built-in OpenSSH Server on the default **port 22**.
 `run_onchange_after_35-windows-ssh.ps1.tmpl` installs the
 `OpenSSH.Server~~~~0.0.1.0` Windows capability when needed, sets `sshd` to
 start automatically, starts it, and creates a `Windows SSH (TCP 22)` inbound
-firewall rule on the `Any` profile. The capability install and service setup
-need an elevated PowerShell. Connect to the Windows host with:
+firewall rule on the `Any` profile. It also sets OpenSSH's `DefaultShell`
+registry value to PowerShell 7 (`pwsh.exe`), preferring the machine-wide MSI
+path and falling back to the discovered winget/MSIX package, so SSH sessions
+start in PowerShell 7 rather than `cmd.exe`. The capability install and service
+setup need an elevated PowerShell. Connect to the Windows host with:
 
 ```sh
 ssh <windows-user>@<windows-lan-ip>
@@ -586,9 +589,10 @@ when that matters.
   WezTerm stays installed for WSL-only sessions and opens WSL2 directly.
 - `run_onchange_after_35-windows-ssh.ps1.tmpl` enables the built-in Windows
   OpenSSH Server on port 22: it installs the `OpenSSH.Server` capability, sets
-  the `sshd` service to Automatic and starts it, and adds a `Windows SSH (TCP
-  22)` inbound firewall rule for the `Any` profile. It needs an elevated shell.
-  WSL2 stays on 2222, so both are reachable at the same LAN address.
+  the `sshd` service to Automatic and starts it, adds a `Windows SSH (TCP 22)`
+  inbound firewall rule for the `Any` profile, and points `DefaultShell` at
+  PowerShell 7 (`pwsh.exe`). It needs an elevated shell. WSL2 stays on 2222, so
+  both are reachable at the same LAN address.
 - `run_onchange_after_40-wsl.ps1.tmpl` sets WSL2 as the default version and
   registers the `Ubuntu` distribution when it is missing. The first
   `wsl --install` that enables the optional Windows features needs an elevated
@@ -785,7 +789,9 @@ chezmoi verify
   `Get-WindowsCapability -Online -Name OpenSSH.Server*`, and
   `Get-NetFirewallRule -DisplayName 'Windows SSH (TCP 22)'`. If the service
   failed to start because WSL was holding port 22, run `wsl --shutdown` and
-  restart the service.
+  restart the service. After connecting, `$PSVersionTable.PSVersion` should
+  report 7.x; if it reports 5.1, check `Get-ItemProperty HKLM:\SOFTWARE\OpenSSH`
+  for the `DefaultShell` value.
 - **Cannot reach WSL2 over SSH or mosh from another machine** — check that
   `~/.wslconfig` contains `networkingMode=mirrored`, run `wsl --shutdown`, and
   reopen Ubuntu. Confirm the rules exist (`Get-NetFirewallRule -DisplayName

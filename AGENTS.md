@@ -207,10 +207,16 @@ this file only records what agents otherwise get wrong.
 - Windows SSH is enabled by `run_onchange_after_35-windows-ssh.ps1.tmpl` from
   the built-in `OpenSSH.Server~~~~0.0.1.0` capability, not winget: it sets the
   `sshd` service to Automatic, starts it, and adds a `Windows SSH (TCP 22)`
-  inbound firewall rule on the `Any` profile. Do not add
-  `Microsoft.OpenSSH.Beta` to the winget list. Windows keeps port 22 and WSL2
-  keeps 2222, so both are reachable at the same LAN address. The capability and
-  service setup need elevation; keep the warning when chezmoi is not elevated.
+  inbound firewall rule on the `Any` profile. It also sets
+  `HKLM:\SOFTWARE\OpenSSH\DefaultShell` to PowerShell 7 (`pwsh.exe`) and
+  `DefaultShellCommandOption` to `-c`, preferring
+  `%ProgramFiles%\PowerShell\7\pwsh.exe`, then a discovered non-alias
+  `pwsh.exe`, then the `Microsoft.PowerShell` MSIX package path. Do not point
+  this at `powershell.exe` (5.1) or the bare WindowsApps execution alias. Do not
+  add `Microsoft.OpenSSH.Beta` to the winget list. Windows keeps port 22 and
+  WSL2 keeps 2222, so both are reachable at the same LAN address. The capability
+  and service setup need elevation; keep the warning when chezmoi is not
+  elevated.
 - `dot_wslconfig` is the Windows-only target `~/.wslconfig` and must stay under
   the non-Windows branch of `.chezmoiignore`. It sets
   `networkingMode=mirrored`, which puts the WSL2 distribution on the Windows

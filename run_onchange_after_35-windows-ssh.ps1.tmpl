@@ -41,6 +41,38 @@ if ($capability.State -eq 'Installed') {
     }
 }
 
+# Point SSH sessions at PowerShell 7, not the cmd.exe default. Prefer the
+# machine-wide MSI path; the winget install may instead provide the MSIX
+# package, whose family path is stable but lives under WindowsApps.
+$pwsh = Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'
+if (-not (Test-Path -LiteralPath $pwsh)) {
+    $pwsh = Get-Command pwsh.exe -All -ErrorAction SilentlyContinue |
+        Where-Object { $_.Source -and $_.Source -notlike '*\WindowsApps\pwsh.exe' } |
+        Select-Object -First 1 -ExpandProperty Source
+}
+if (-not $pwsh -or -not (Test-Path -LiteralPath $pwsh)) {
+    $package = Get-AppxPackage -Name Microsoft.PowerShell -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($package -and $package.InstallLocation) {
+        $pwsh = Join-Path $package.InstallLocation 'pwsh.exe'
+    }
+}
+
+if (-not $pwsh -or -not (Test-Path -LiteralPath $pwsh)) {
+    Write-Warning 'PowerShell 7 (pwsh.exe) was not found; leaving the SSH default shell unchanged.'
+} else {
+    try {
+        New-Item -Path 'HKLM:\SOFTWARE\OpenSSH' -Force | Out-Null
+        New-ItemProperty -Path 'HKLM:\SOFTWARE\OpenSSH' -Name DefaultShell `
+            -Value $pwsh -PropertyType String -Force | Out-Null
+        New-ItemProperty -Path 'HKLM:\SOFTWARE\OpenSSH' -Name DefaultShellCommandOption `
+            -Value '-c' -PropertyType String -Force | Out-Null
+        Write-Host "SSH default shell: $pwsh"
+    } catch {
+        Write-Warning "Could not set the SSH default shell: $($_.Exception.Message)"
+    }
+}
+
 $sshd = Get-Service -Name sshd -ErrorAction SilentlyContinue
 if (-not $sshd) {
     Write-Warning 'The sshd service is not available yet; reboot and re-run chezmoi apply.'
