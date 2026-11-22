@@ -30,6 +30,7 @@ $packages = @(
     'Neovim.Neovim'
     'GNU.Emacs'
     'GitHub.cli'
+    'Amazon.AWSCLI'
     'Postman.Postman'
     'Tencent.WeixinDevTools'
     'astral-sh.uv'
@@ -37,7 +38,7 @@ $packages = @(
     'Zellij.Zellij'
     'JesseDuffield.lazygit'
     'Anomaly.OpenCode'
-    'OpenJS.NodeJS.LTS'
+    'Schniz.fnm'
     'mvdan.shfmt'
     'koalaman.shellcheck'
     'DEVCOM.JetBrainsMonoNerdFont'
@@ -61,31 +62,52 @@ if ($failed.Count -gt 0) {
     Write-Warning "Some winget packages failed: $($failed -join ', ')"
 }
 
-# Prettier (through npm) formats JS/TS/HTML/CSS/JSON/YAML/Markdown in Emacs.
-# Node's MSI updates the persistent PATH, but this process may not see it yet,
-# so prefer the known npm.cmd locations before falling back to Get-Command.
-$prettierCmd = Join-Path $env:APPDATA 'npm\prettier.cmd'
-if (-not (Test-Path $prettierCmd)) {
-    $npmCmd = @(
-        (Join-Path $env:ProgramFiles 'nodejs\npm.cmd')
-        (Join-Path $env:LOCALAPPDATA 'Programs\nodejs\npm.cmd')
-        (Get-Command npm.cmd -ErrorAction SilentlyContinue).Source
-    ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+# Node.js is managed by fnm on every platform, never by the Node.js MSI. winget
+# installs the portable fnm shim under WinGet\Links, which this process may not
+# see on PATH yet, so probe the known location first.
+$fnmCmd = @(
+    (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links\fnm.exe')
+    (Get-Command fnm.exe -ErrorAction SilentlyContinue).Source
+) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 
-    if (-not $npmCmd) {
-        $npm = Get-Command npm -ErrorAction SilentlyContinue
-        if ($npm) { $npmCmd = $npm.Source }
+if ($fnmCmd) {
+    Write-Host 'installing: Node.js LTS (fnm)'
+    & $fnmCmd install --lts
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning 'fnm install --lts failed'
     }
+    & $fnmCmd default lts-latest
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning 'fnm default lts-latest failed'
+    }
+    # Put the default Node.js and npm on PATH for the npm installs below.
+    & $fnmCmd env --use-on-cd --shell powershell | Out-String | Invoke-Expression
+} else {
+    Write-Warning 'fnm was not found; Node.js, npm and aws-cdk were not installed'
+}
 
-    if ($npmCmd) {
+# npm global packages go under %APPDATA%\npm (the conventional Windows prefix;
+# the profile adds it to PATH). Prettier formats JS/TS/HTML/CSS/JSON/YAML/
+# Markdown in Emacs, and AWS CDK is distributed through npm.
+$npmBin = Join-Path $env:APPDATA 'npm'
+$npmCmd = (Get-Command npm.cmd -ErrorAction SilentlyContinue).Source
+if ($npmCmd) {
+    if (-not (Test-Path (Join-Path $npmBin 'prettier.cmd'))) {
         Write-Host 'installing: prettier (npm)'
-        & $npmCmd install -g prettier
+        & $npmCmd install -g --prefix $npmBin prettier
         if ($LASTEXITCODE -ne 0) {
             Write-Warning 'prettier installation failed'
         }
-    } else {
-        Write-Warning 'npm was not found; prettier was not installed'
     }
+    if (-not (Test-Path (Join-Path $npmBin 'cdk.cmd'))) {
+        Write-Host 'installing: AWS CDK (npm)'
+        & $npmCmd install -g --prefix $npmBin aws-cdk
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning 'AWS CDK installation failed'
+        }
+    }
+} else {
+    Write-Warning 'npm was not found; prettier and aws-cdk were not installed'
 }
 
 Write-Host 'Windows packages complete. Open a new terminal to pick up PATH changes.'

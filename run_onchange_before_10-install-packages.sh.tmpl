@@ -61,6 +61,7 @@ neovim
 emacs
 direnv
 gh
+awscli
 starship
 lazygit
 zellij
@@ -163,7 +164,7 @@ for pkg in $unavailable; do
         install_from_url opencode https://opencode.ai/v2/install bash --no-modify-path
         ;;
     fnm)
-        # Node.js is managed by fnm on Linux and macOS, never by apt or
+        # Node.js is managed by fnm on every platform, never by apt or
         # Homebrew: distro packages lag behind, and `fnm install --lts` plus
         # `fnm use`/`.node-version` is how versions are switched per project.
         if ! has fnm; then
@@ -204,6 +205,19 @@ for pkg in $unavailable; do
         ;;
     esac
 done
+
+# AWS CDK is distributed through npm, so it is installed after fnm has put the
+# default Node.js on PATH. Use the same ~/.local prefix as prettier so `cdk`
+# stays available across fnm version switches.
+if has npm; then
+    if ! has cdk; then
+        echo "==> installing AWS CDK (npm, user prefix)"
+        npm install -g --prefix "$HOME/.local" aws-cdk ||
+            echo "warning: AWS CDK installation failed" >&2
+    fi
+elif ! has cdk; then
+    echo "warning: AWS CDK needs npm from fnm; skipping AWS CDK" >&2
+fi
 
 # Ubuntu 26.04 packages Starship 1.22.1, which predates jj_bookmark and prints
 # an "Unknown key" warning on every prompt. Upgrade in place; ~/.local/bin is
@@ -266,6 +280,7 @@ neovim
 emacs
 direnv
 gh
+awscli
 lazygit
 podman
 uv
@@ -308,7 +323,7 @@ wechatwebdevtools
 # shellcheck disable=SC2086  # word splitting of the cask list is intended
 brew_install_missing cask $BREW_CASKS
 
-# Node.js is managed by fnm on Linux and macOS, never by apt or Homebrew: the
+# Node.js is managed by fnm on every platform, never by apt or Homebrew: the
 # distro formulae lag behind, and `fnm install --lts` plus `fnm use` or a
 # project `.node-version` is how versions are switched. The `node` and
 # `prettier` formulae are deliberately absent from BREW_PACKAGES because the
@@ -331,11 +346,17 @@ if command -v fnm >/dev/null 2>&1; then
             npm install -g --prefix "$HOME/.local" prettier ||
                 echo "warning: prettier installation failed" >&2
         fi
+        if ! command -v cdk >/dev/null 2>&1; then
+            echo "==> installing AWS CDK (npm, user prefix)"
+            mkdir -p "$HOME/.local/bin"
+            npm install -g --prefix "$HOME/.local" aws-cdk ||
+                echo "warning: AWS CDK installation failed" >&2
+        fi
     else
-        echo "warning: npm was not found; prettier was not installed" >&2
+        echo "warning: npm was not found; prettier and aws-cdk were not installed" >&2
     fi
 else
-    echo "warning: fnm is unavailable; Node.js and prettier were not installed" >&2
+    echo "warning: fnm is unavailable; Node.js, prettier and aws-cdk were not installed" >&2
 fi
 
 echo "==> macOS packages complete"

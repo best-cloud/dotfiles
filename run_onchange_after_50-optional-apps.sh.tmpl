@@ -1,9 +1,9 @@
 {{ if and (eq .chezmoi.os "darwin") (get . "installOptionalApps") -}}
 #!/bin/sh
-# Install optional daily-use applications on macOS with Homebrew.
+# Install optional applications on macOS with Homebrew.
 # Opt in with `installOptionalApps = true` under [data] in
 # ~/.config/chezmoi/chezmoi.toml, then run `chezmoi apply`.
-# Keep these casks disjoint from BREW_PACKAGES/BREW_CASKS in
+# Keep these formulae and casks disjoint from BREW_PACKAGES/BREW_CASKS in
 # run_onchange_before_10-install-packages.sh.tmpl; optional apps must not repeat
 # the mandatory development tools.
 set -eu
@@ -15,6 +15,17 @@ if ! command -v brew >/dev/null 2>&1; then
     echo "warning: Homebrew is unavailable; skipping optional applications" >&2
     exit 0
 fi
+
+# yt-dlp's strongly recommended dependencies: ffmpeg/ffprobe, yt-dlp-ejs (the
+# formula includes it) and Deno as the JavaScript runtime for yt-dlp-ejs.
+BREW_TOOLS="
+ffmpeg
+deno
+yt-dlp
+"
+
+# shellcheck disable=SC2086  # word splitting of the package list is intended
+brew_install_missing formula $BREW_TOOLS
 
 BREW_CASKS="
 1password

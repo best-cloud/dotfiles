@@ -1,0 +1,11 @@
+# Managed by chezmoi. Edit dot_config/yt-dlp/config in the dotfiles repo.
+#
+# yt-dlp-ejs provides full YouTube support. Use Deno (the recommended runtime)
+# and allow yt-dlp to fetch the EJS components from npm when they are not
+# already installed with yt-dlp.
+--js-runtimes deno
+--remote-components ejs:npm
+
+# Skip videos already recorded in archive.txt. The path is relative to the
+# current working directory, so each download directory keeps its own archive.
+--download-archive ./archive.txt

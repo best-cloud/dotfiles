@@ -93,12 +93,12 @@ GitHub (SSH key or `gh auth login`), or pass an SSH URL through
 | Core CLI | git, curl, wget, build-essential, unzip, zip, bsdextrautils (col) | git, wget | Git |
 | Modern CLI | ripgrep, fd-find, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq |
 | Editors / multiplexers | neovim, emacs, zellij | neovim, emacs, zellij | Neovim, Emacs, Zellij |
-| Dev tools | gh, direnv, uv, lazygit, mosh | gh, direnv, uv, lazygit, mosh, WeChat DevTools, Postman | gh, uv, lazygit, WeChat DevTools, Postman (mosh via WSL) |
+| Dev tools | gh, direnv, uv, AWS CLI, AWS CDK, lazygit, mosh | gh, direnv, uv, AWS CLI, AWS CDK, lazygit, mosh, WeChat DevTools, Postman | gh, uv, AWS CLI, AWS CDK, lazygit, WeChat DevTools, Postman (mosh via WSL) |
 | Containers | podman | podman | — |
-| Node.js | fnm + Node.js LTS (no apt) | fnm + Node.js LTS (no Homebrew) | Node.js LTS (winget) |
+| Node.js | fnm + Node.js LTS (no apt) | fnm + Node.js LTS (no Homebrew) | fnm + Node.js LTS (winget) |
 | AI / Python tooling | opencode, ruff, ollama | opencode, ruff, ollama | OpenCode, Ruff (ollama via WSL) |
 | Formatters / linters | prettier, shfmt, shellcheck | prettier, shfmt, shellcheck | Prettier, shfmt, ShellCheck |
-| Optional daily-use apps | — | see below | see below |
+| Optional daily-use apps | see below (CLI tools) | see below | see below |
 | Terminal | — (client terminal) | Ghostty | Windows Terminal, WezTerm |
 | WSL2 / Ubuntu | — (native) | — | Microsoft.WSL + latest Ubuntu LTS |
 | Terminal font | — (client terminal) | JetBrainsMono Nerd Font | JetBrainsMono Nerd Font |
@@ -127,6 +127,11 @@ installer and puts the launcher in `~/.opencode/bin`, which fish already adds to
 (`anomalyco/tap/opencode-v2`), and Windows installs the official portable
 `Anomaly.OpenCode` winget package.
 
+The AWS CLI comes from apt (`awscli`), Homebrew (`awscli`) and winget
+(`Amazon.AWSCLI`). AWS CDK is distributed only through npm, so the scripts
+install `aws-cdk` globally into `~/.local` (Unix) or `%APPDATA%\npm` (Windows)
+after fnm has installed Node.js; both prefixes are on `PATH`.
+
 Ubuntu packages `mosh` but not `ollama` (it ships only the `python3-ollama`
 client library), so the Linux script installs Ollama with the upstream installer
 at <https://ollama.com/install.sh>. That installer needs root, so it runs through
@@ -147,29 +152,27 @@ in `PATH`, so the newer binary shadows `/usr/bin/starship`.
 
 ### Node.js, prettier and linters
 
-Node.js is never installed by apt or Homebrew. The Linux script installs
-[fnm](https://github.com/Schniz/fnm) with its upstream installer into
-`~/.local/share/fnm` (`--skip-shell`, so the installer does not edit shell rc
-files), and the macOS script installs `fnm` itself from Homebrew. Both then run
-`fnm install --lts` and `fnm default lts-latest`, so the current Node.js LTS is
-the default version.
+Node.js is never installed by apt or Homebrew. Every platform uses
+[fnm](https://github.com/Schniz/fnm): the Linux script installs it with the
+upstream installer into `~/.local/share/fnm` (`--skip-shell`, so the installer
+does not edit shell rc files), macOS installs `fnm` from Homebrew, and Windows
+installs `Schniz.fnm` with winget. Each script then runs `fnm install --lts` and
+`fnm default lts-latest`, so the current Node.js LTS is the default version.
 
-fish runs `fnm env --use-on-cd`, which puts the default Node.js and npm on
-`PATH` and switches versions automatically in directories with a
-`.node-version` or `.nvmrc` file. `fnm install <version>`, `fnm use <version>`
-and `fnm list` work as usual. Spacemacs does not use Node.js: nothing in the
-managed Emacs config calls `node`, so only the shell and the tools you run
-yourself need it.
+fish runs `fnm env --use-on-cd`; the PowerShell profile runs the same setup
+with `--shell powershell`. That puts the default Node.js and npm on `PATH` and
+switches versions automatically in directories with a `.node-version` or
+`.nvmrc` file. `fnm install <version>`, `fnm use <version>` and `fnm list` work
+as usual. Spacemacs does not use Node.js: nothing in the managed Emacs config
+calls `node`, so only the shell and the tools you run yourself need it.
 
-Windows is the exception: it keeps `OpenJS.NodeJS.LTS` from winget, because fnm
-is not part of the Windows setup.
-
-Prettier is installed with `npm install -g --prefix "$HOME/.local" prettier` on
-every platform, including macOS. It is deliberately not the Homebrew `prettier`
-formula, because that formula depends on Homebrew's Node.js. Installing it into
-`~/.local` keeps `prettier` on `PATH` regardless of which fnm version is active.
-`shfmt` and `shellcheck` come from apt, Homebrew and winget; they are the
-linters used by `scripts/check.sh`.
+Prettier is installed with npm on every platform, including macOS. It is
+deliberately not the Homebrew `prettier` formula, because that formula depends
+on Homebrew's Node.js. On Unix the prefix is `~/.local`, which stays on `PATH`
+regardless of which fnm version is active; on Windows the conventional
+`%APPDATA%\npm` prefix is used and the PowerShell profile adds it to `PATH`.
+AWS CDK uses the same prefixes. `shfmt` and `shellcheck` come from apt,
+Homebrew and winget; they are the linters used by `scripts/check.sh`.
 
 WSL appends the Windows `PATH`, so the install probes ignore non-native
 executables (paths under `/mnt` or ending in `.exe`). Otherwise an inherited
@@ -179,19 +182,30 @@ Windows shim.
 
 ### Optional daily-use apps
 
-Windows and macOS can also install a personal set of daily-use applications.
-They are opt-in because not every machine wants them: `chezmoi init` asks once
-and defaults to no, and the answer is stored as `installOptionalApps` in
+Every platform can also install a personal set of optional applications. They
+are opt-in because not every machine wants them: `chezmoi init` asks once and
+defaults to no, and the answer is stored as `installOptionalApps` in
 `~/.config/chezmoi/chezmoi.toml`. At the prompt, enter `y` (or `yes`/`true`) to
 install the list, or `n` (or `no`/`false`, or just Enter) to skip it.
 
-- macOS (Homebrew casks): `1password`, `google-chrome`, `flclash`, `notion`,
+- Linux (apt + uv + upstream installers): `ffmpeg`, `deno`, `yt-dlp`.
+- macOS (Homebrew formulae and casks): `ffmpeg`, `deno`, `yt-dlp`, plus the
+  desktop casks `1password`, `google-chrome`, `flclash`, `notion`,
   `onlyoffice`, `iina`, `wechat`, `neteasemusic`, `openvpn-connect`,
   `windows-app`.
-- Windows (winget): `AgileBits.1Password`, `Flow-Launcher.Flow-Launcher`,
+- Windows (winget): `yt-dlp.FFmpeg`, `DenoLand.Deno`, `yt-dlp.yt-dlp`, plus the
+  desktop packages `AgileBits.1Password`, `Flow-Launcher.Flow-Launcher`,
   `Google.Chrome.EXE`, `chen08209.FlClash`, `Notion.Notion`,
   `ONLYOFFICE.DesktopEditors`, `Daum.PotPlayer`, `SumatraPDF.SumatraPDF`,
   `Tencent.WeChat.Universal`, `NetEase.CloudMusic`.
+
+`yt-dlp` gets its strongly recommended dependencies on every platform:
+`ffmpeg`/`ffprobe`, `yt-dlp-ejs` (bundled by the Homebrew formula and the
+official Windows executable, and installed through uv's `default` extra on
+Linux) and Deno as the JavaScript runtime. The managed
+`~/.config/yt-dlp/config` selects Deno, allows `ejs:npm` remote components and
+keeps a per-directory `archive.txt` download archive; XDG config is used on
+Windows too because the profile sets `XDG_CONFIG_HOME`.
 
 The macOS `flclash` cask is published in the `chen08209/tap` tap rather than
 homebrew-cask, so the optional script taps it and installs it separately from
@@ -201,13 +215,14 @@ before the install.
 
 The optional lists are deliberately disjoint from the mandatory package lists:
 do not add a package to both stages. The main install scripts own development
-tools and shared CLI utilities; the optional scripts own personal applications.
+tools and shared CLI utilities; the optional scripts own personal applications
+(and Linux's optional list stays limited to CLI tools rather than desktop GUI
+apps).
 
 To enable it on an existing machine, add `installOptionalApps = true` under
 `[data]` in `~/.config/chezmoi/chezmoi.toml` and run `chezmoi apply`; set it to
 false to stop managing the list. `run_onchange_after_50-optional-apps.*` only
-runs when the value is true. These lists are desktop-only by design: Linux
-installs no personal applications. The WeChat DevTools and Postman packages are
+runs when the value is true. The WeChat DevTools and Postman packages are
 development tools and are installed unconditionally on macOS and Windows.
 
 ## Ubuntu mirror (TUNA)
@@ -260,6 +275,7 @@ production machine needs immediate security updates.
 │   ├── starship.toml                   # catppuccin-powerline preset, all OSes
 │   ├── zellij/config.kdl               # shared; Windows uses ZELLIJ_CONFIG_DIR
 │   ├── nvim/init.lua                   # plugin-free, works offline
+│   ├── yt-dlp/config                   # optional yt-dlp/Deno/archive settings
 │   ├── wezterm/wezterm.lua             # WezTerm (alternative), WSL2 Ubuntu only
 │   └── ghostty/config                  # macOS terminal
 ├── AppData/
@@ -279,6 +295,7 @@ production machine needs immediate security updates.
 ├── run_onchange_after_30-spacemacs.ps1.tmpl           # clone Spacemacs (Windows)
 ├── run_onchange_after_40-wsl.ps1.tmpl                 # WSL2 + Ubuntu
 ├── run_onchange_after_50-optional-apps.sh.tmpl        # optional macOS apps
+├── run_onchange_after_50-optional-apps-linux.sh.tmpl  # optional Linux CLI apps
 └── run_onchange_after_50-optional-apps.ps1.tmpl       # optional Windows apps
 ```
 
@@ -346,7 +363,8 @@ After editing `bootstrap.sh.tmpl`, `bootstrap.ps1.tmpl`, or anything under
    `run_onchange_before_10-install-packages.sh.tmpl` (apt and Homebrew lists)
    and/or `run_onchange_before_10-install-packages.ps1.tmpl` (winget ID).
    Personal daily-use applications belong in
-   `run_onchange_after_50-optional-apps.sh.tmpl` (Homebrew) or
+   `run_onchange_after_50-optional-apps.sh.tmpl` (Homebrew),
+   `run_onchange_after_50-optional-apps-linux.sh.tmpl` (Linux CLI tools) or
    `run_onchange_after_50-optional-apps.ps1.tmpl` (winget); those scripts only
    run when `installOptionalApps` is true.
 2. Run `chezmoi apply`.
@@ -369,8 +387,8 @@ genuinely differ.
 
 `dot_config/fish/config.fish.tmpl` is the only managed fish file. It:
 
-- adds `~/.local/bin`, `~/.cargo/bin` and (on Linux) `~/.local/share/fnm` to
-  `PATH`;
+- adds `~/.local/bin`, `~/.cargo/bin`, `~/.deno/bin` and (on Linux)
+  `~/.local/share/fnm` to `PATH`;
 - loads Homebrew's `shellenv` on macOS only;
 - initializes fnm (`fnm env --use-on-cd`) when it is installed;
 - defines `fd`/`bat` wrappers for Ubuntu's `fdfind`/`batcat` names;
@@ -663,11 +681,17 @@ chezmoi verify
   Starship >= 1.27.0. The install script upgrades Ubuntu's packaged 1.22.1 into
   `~/.local/bin`; if the warning persists, check that `command -v starship`
   resolves to `~/.local/bin/starship` and re-run `chezmoi apply`.
-- **`node`/`npm` are missing or the wrong version** — Node.js comes from fnm.
-  Run `fnm list`, `fnm install --lts` and `fnm default lts-latest`, then open a
-  new shell (`fnm env --use-on-cd` is sourced by fish). If a machine previously
-  installed Node.js with apt or Homebrew, remove it (`sudo apt-get remove
-  nodejs npm` or `brew uninstall node prettier`) so the fnm version wins.
+- **`node`/`npm` are missing or the wrong version** — Node.js comes from fnm on
+  every platform. Run `fnm list`, `fnm install --lts` and
+  `fnm default lts-latest`, then open a new shell (`fnm env --use-on-cd` is
+  sourced by fish and by the PowerShell profile). If a machine previously
+  installed Node.js with apt, Homebrew or winget, remove it (`sudo apt-get
+  remove nodejs npm`, `brew uninstall node prettier`, or `winget uninstall
+  OpenJS.NodeJS.LTS`) so the fnm version wins.
+- **`yt-dlp` warns that no JavaScript runtime is available** — the optional
+  apps install Deno, and `~/.config/yt-dlp/config` sets `--js-runtimes deno`.
+  Check `deno --version`; on Linux the official installer puts it in
+  `~/.deno/bin`, which fish adds to `PATH`.
 - **A command resolves to `/mnt/c/...`** — WSL appends the Windows `PATH`, so
   `prettier`, `zellij`, `emacs` and similar tools can fall through to a Windows
   shim when no native binary exists. The install scripts ignore `/mnt` and

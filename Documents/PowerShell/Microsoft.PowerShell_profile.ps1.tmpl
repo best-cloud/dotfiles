@@ -8,10 +8,30 @@
 {{ include "scripts/lib/path.ps1" }}
 Add-PathEntry (Join-Path $HOME '.local\bin')
 
-# winget installs portable CLI shims here (for example OpenCode).
+# winget installs portable CLI shims here (for example OpenCode and fnm).
 $wingetLinks = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'
 if (Test-Path $wingetLinks) {
     Add-PathEntry $wingetLinks
+}
+
+# npm global packages (prettier, aws-cdk) land here. The Node.js MSI used to
+# add this directory to PATH; fnm does not, so add it explicitly.
+$npmBin = Join-Path $env:APPDATA 'npm'
+if (Test-Path $npmBin) {
+    Add-PathEntry $npmBin
+}
+
+# Deno's official installer uses ~/.deno/bin (winget exposes deno through the
+# WinGet links directory above instead).
+$denoBin = Join-Path $HOME '.deno\bin'
+if (Test-Path $denoBin) {
+    Add-PathEntry $denoBin
+}
+
+# Node.js is managed by fnm on every platform. `--use-on-cd` switches versions
+# automatically in directories with a .node-version or .nvmrc file.
+if (Get-Command fnm -ErrorAction SilentlyContinue) {
+    fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression
 }
 
 # GNU Emacs installs into a versioned directory (for example

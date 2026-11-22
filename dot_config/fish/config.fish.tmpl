@@ -26,6 +26,10 @@ end
 fish_add_path --global ~/.local/share/fnm
 {{ end -}}
 
+# The official Deno installer places its binary here (the optional-apps scripts
+# run it with --no-modify-path). Homebrew uses its own bin directory on macOS.
+fish_add_path --global ~/.deno/bin
+
 # Put the default Node.js (and its npm) on PATH; --use-on-cd switches versions
 # automatically when a directory has a .node-version or .nvmrc file.
 if type -q fnm

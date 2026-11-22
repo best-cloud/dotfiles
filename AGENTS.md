@@ -79,20 +79,35 @@ this file only records what agents otherwise get wrong.
   development tools installed on macOS (`postman`, `wechatwebdevtools` casks)
   and Windows (`Postman.Postman`, `Tencent.WeixinDevTools`), not on Linux. The
   opt-in `installOptionalApps` lists in `run_onchange_after_50-optional-apps.*`
-  are Windows/macOS only and must stay optional and disjoint from the mandatory
-  lists: do not move them into the mandatory lists, duplicate them across both
-  stages, or add an apt branch. Their templates read the flag with
-  `(get . "installOptionalApps")`, so configs created before the key existed
-  still render as disabled.
-- Node.js is the deliberate exception: it is never installed by apt or Homebrew.
-  The Linux branch installs fnm with its upstream installer
-  (`--skip-shell --install-dir ~/.local/share/fnm`) and the macOS branch installs
-  the `fnm` formula; both then run `fnm install --lts` and
+  exist on all three platforms and must stay optional and disjoint from the
+  mandatory lists: do not move them into the mandatory lists, duplicate them
+  across both stages, or add an apt branch to the macOS/Windows scripts. The
+  Linux list (`run_onchange_after_50-optional-apps-linux.sh.tmpl`) is CLI-only
+  and owns `ffmpeg`, `deno` and `yt-dlp`; it may use apt/sudo for `ffmpeg`.
+  Their templates read the flag with `(get . "installOptionalApps")`, so
+  configs created before the key existed still render as disabled.
+- Node.js is the deliberate exception: it is never installed by apt, Homebrew or
+  winget's `OpenJS.NodeJS.LTS`. The Linux branch installs fnm with its upstream
+  installer (`--skip-shell --install-dir ~/.local/share/fnm`), the macOS branch
+  installs the `fnm` formula, and the Windows branch installs `Schniz.fnm` with
+  winget; all three then run `fnm install --lts` and
   `fnm default lts-latest`. Do not add `nodejs`/`npm` back to PACKAGES, `node`
   to BREW_PACKAGES, or the `prettier` formula (it depends on Homebrew Node.js).
-  Windows keeps `OpenJS.NodeJS.LTS` from winget. fish sources
-  `fnm env --use-on-cd`. Spacemacs does not use Node.js, so nothing in
-  `dot_spacemacs` should grow a `node` dependency.
+  fish sources `fnm env --use-on-cd` and the PS7 profile runs
+  `fnm env --use-on-cd --shell powershell`. Spacemacs does not use Node.js, so
+  nothing in `dot_spacemacs` should grow a `node` dependency.
+- AWS CLI is in all three package lists (`awscli` on apt/Homebrew,
+  `Amazon.AWSCLI` on winget). AWS CDK ships only through npm, so each branch
+  installs `aws-cdk` after fnm: `~/.local` on Unix and `%APPDATA%\npm` on
+  Windows, the same prefixes as prettier.
+- Optional yt-dlp always gets its strongly recommended dependencies: ffmpeg/
+  ffprobe, yt-dlp-ejs and Deno. Linux installs ffmpeg with apt, Deno with the
+  upstream installer into `~/.deno/bin` (`--no-modify-path`, added by fish and
+  the profile) and `yt-dlp[default]` with uv; macOS uses the `ffmpeg`, `deno`
+  and `yt-dlp` formulae; Windows uses `yt-dlp.FFmpeg`, `DenoLand.Deno` and
+  `yt-dlp.yt-dlp`. `dot_config/yt-dlp/config` selects `--js-runtimes deno`,
+  allows `--remote-components ejs:npm` and sets
+  `--download-archive ./archive.txt` (relative to the current directory).
 - OpenCode is not packaged by apt: Linux uses its upstream installer into
   `~/.opencode/bin` (already on the script's and fish's `PATH`), macOS uses the
   `anomalyco/tap/opencode-v2` Homebrew tap outside `BREW_PACKAGES`, and Windows
@@ -165,6 +180,9 @@ this file only records what agents otherwise get wrong.
   and WezTerm read `~/.config`. Removing them silently breaks all four. It also
   sets `SHELL` (`pwsh` on 7, `powershell` on 5.1) so Zellij panes do not fall
   back to `cmd.exe`; keep the version check because 5.1 dot-sources this file.
+  It also adds `%APPDATA%\npm` to `PATH` (npm global installs of prettier and
+  aws-cdk) and runs `fnm env --use-on-cd --shell powershell`; the Node.js MSI
+  used to provide both, so removing them breaks `node`, `cdk` and `prettier`.
 - Windows Terminal is the default Windows client. Its settings are the managed
   target `AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json`,
   which must stay in `.chezmoiignore` on non-Windows. PowerShell 7 is

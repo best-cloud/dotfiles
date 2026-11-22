@@ -1,0 +1,54 @@
+{{ if and (eq .chezmoi.os "linux") (get . "installOptionalApps") -}}
+#!/bin/sh
+# Install optional CLI applications on Ubuntu Server / WSL2.
+# Opt in with `installOptionalApps = true` under [data] in
+# ~/.config/chezmoi/chezmoi.toml, then run `chezmoi apply`.
+# Keep this list disjoint from the mandatory package lists in
+# run_onchange_before_10-install-packages.sh.tmpl.
+set -eu
+
+{{ include "scripts/lib/shell.sh" }}
+{{ include "scripts/lib/installers.sh" }}
+
+PATH="$HOME/.deno/bin:$HOME/.local/bin:$PATH"
+export PATH
+has() { native_cmd "$1"; }
+
+# yt-dlp's strongly recommended dependencies are ffmpeg/ffprobe and a
+# JavaScript runtime for yt-dlp-ejs; this uses Deno. ffprobe ships with the
+# ffmpeg package.
+if ! dpkg -s ffmpeg >/dev/null 2>&1; then
+    if ! can_root; then
+        echo "warning: root or sudo is required to install ffmpeg; skipping ffmpeg" >&2
+    else
+        if [ "$(id -u)" -ne 0 ]; then
+            sudo -v
+        fi
+        echo "==> apt-get install: ffmpeg"
+        as_root env DEBIAN_FRONTEND=noninteractive \
+            apt-get install -y --no-install-recommends ffmpeg ||
+            echo "warning: ffmpeg installation failed" >&2
+    fi
+fi
+
+if ! has deno; then
+    echo "==> installing deno (not packaged by apt)"
+    # --no-modify-path: fish and the PowerShell profile add ~/.deno/bin.
+    install_from_url deno https://deno.land/install.sh sh --no-modify-path
+    hash -r 2>/dev/null || true
+fi
+
+# The default extra includes yt-dlp-ejs. uv keeps yt-dlp in an isolated tool
+# environment and links its launcher into ~/.local/bin.
+if has yt-dlp; then
+    echo "already installed: yt-dlp"
+elif has uv; then
+    echo "==> installing yt-dlp (uv tool)"
+    uv tool install "yt-dlp[default]" ||
+        echo "warning: yt-dlp installation failed" >&2
+else
+    echo "warning: yt-dlp needs uv; skipping yt-dlp" >&2
+fi
+
+echo "==> Linux optional applications complete"
+{{ end -}}

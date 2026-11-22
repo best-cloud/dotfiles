@@ -1,5 +1,5 @@
 {{ if and (eq .chezmoi.os "windows") (get . "installOptionalApps") -}}
-# Install optional daily-use applications on Windows 11 with winget.
+# Install optional applications on Windows 11 with winget.
 # Opt in with `installOptionalApps = true` under [data] in
 # %USERPROFILE%\.config\chezmoi\chezmoi.toml, then run `chezmoi apply`.
 # Keep this list disjoint from run_onchange_before_10-install-packages.ps1.tmpl;
@@ -22,6 +22,11 @@ $packages = @(
     'SumatraPDF.SumatraPDF'
     'Tencent.WeChat.Universal'
     'NetEase.CloudMusic'
+    # yt-dlp's strongly recommended dependencies: ffmpeg/ffprobe and Deno as
+    # the JavaScript runtime for yt-dlp-ejs (the yt-dlp executable bundles it).
+    'yt-dlp.FFmpeg'
+    'DenoLand.Deno'
+    'yt-dlp.yt-dlp'
 )
 
 {{ include "scripts/lib/winget.ps1" }}

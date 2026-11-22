@@ -14,12 +14,13 @@ sourceDir = {{ .chezmoi.sourceDir | quote }}
     email = {{ promptStringOnce . "email" "Email address for Git commits" "you@example.com" | quote }}
     editor = "nvim"
 
-    # Optional daily-use applications on Windows and macOS (1Password, Chrome,
+    # Optional applications on every platform: yt-dlp plus its ffmpeg/Deno
+    # dependencies, and desktop extras on Windows/macOS (1Password, Chrome,
     # Notion, IINA/PotPlayer, WeChat, music clients, ...). Development tools are
     # always installed by the package scripts; this only adds personal extras.
     # Change it by editing [data] in ~/.config/chezmoi/chezmoi.toml (or delete
     # the key and re-run `chezmoi init`).
-    installOptionalApps = {{ promptBoolOnce . "installOptionalApps" "Install optional daily-use apps (1Password, Chrome, Notion, ...) - type y to install, n to skip" false }}
+    installOptionalApps = {{ promptBoolOnce . "installOptionalApps" "Install optional apps (yt-dlp, 1Password, Chrome, Notion, ...) - type y to install, n to skip" false }}
 
     # Detected once at init and available to templates as isWSL, isMacOS and
     # isWindows. .chezmoi.kernel is empty on Windows and macOS, so only read
