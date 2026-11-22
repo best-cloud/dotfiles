@@ -29,7 +29,10 @@ if (Test-Path $denoBin) {
 }
 
 # Node.js is managed by fnm on every platform. `--use-on-cd` switches versions
-# automatically in directories with a .node-version or .nvmrc file.
+# automatically in directories with a .node-version or .nvmrc file. fnm
+# downloads from nodejs.org by default; use the TUNA mirror, the same one the
+# apt and ELPA setup targets, for reliable downloads in China.
+$env:FNM_NODE_DIST_MIRROR = 'https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/'
 if (Get-Command fnm -ErrorAction SilentlyContinue) {
     fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression
 }

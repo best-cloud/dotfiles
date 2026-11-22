@@ -30,6 +30,10 @@ fish_add_path --global ~/.local/share/fnm
 # run it with --no-modify-path). Homebrew uses its own bin directory on macOS.
 fish_add_path --global ~/.deno/bin
 
+# fnm downloads Node.js from nodejs.org by default. Use the TUNA mirror, the
+# same one the apt and ELPA setup targets, for reliable downloads in China.
+set -gx FNM_NODE_DIST_MIRROR https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/
+
 # Put the default Node.js (and its npm) on PATH; --use-on-cd switches versions
 # automatically when a directory has a .node-version or .nvmrc file.
 if type -q fnm

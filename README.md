@@ -222,6 +222,14 @@ does not edit shell rc files), macOS installs `fnm` from Homebrew, and Windows
 installs `Schniz.fnm` with winget. Each script then runs `fnm install --lts` and
 `fnm default lts-latest`, so the current Node.js LTS is the default version.
 
+fnm downloads Node.js from nodejs.org unless told otherwise, so every platform
+points `FNM_NODE_DIST_MIRROR` at the TUNA mirror
+(`https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/`), the same one the apt
+and ELPA setup targets. The install scripts set it for the first install, and
+fish and the PowerShell profile export it so later `fnm install <version>` runs
+use it too. To bypass the mirror for one command, set the variable to
+`https://nodejs.org/dist/` in that shell.
+
 fish runs `fnm env --use-on-cd`; the PowerShell profile runs the same setup
 with `--shell powershell`. That puts the default Node.js and npm on `PATH` and
 switches versions automatically in directories with a `.node-version` or
@@ -776,8 +784,8 @@ chezmoi verify
 - **`node`/`npm` are missing or the wrong version** — Node.js comes from fnm on
   every platform. When the fnm download does not succeed, `chezmoi apply` ends
   with `still missing after this run: node` and the install script is re-run on
-  the next apply. Fix the network (behind a firewall, set
-  `FNM_NODE_DIST_MIRROR=https://registry.npmmirror.com/-/binary/node/`) or run
+  the next apply. fnm already uses the TUNA mirror (`FNM_NODE_DIST_MIRROR`, see
+  above); if the mirror is also unreachable, fix the network or run
   `fnm list`, `fnm install --lts` and `fnm default lts-latest` by hand, then
   open a new shell (`fnm env --use-on-cd` is sourced by fish and by the
   PowerShell profile). If a machine previously installed Node.js with apt,

@@ -183,6 +183,10 @@ for pkg in $unavailable; do
         fi
         if has fnm; then
             echo "==> installing Node.js LTS with fnm (not with apt)"
+            # fnm downloads from nodejs.org by default; use the TUNA mirror,
+            # the same one the apt and ELPA setup targets.
+            FNM_NODE_DIST_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/
+            export FNM_NODE_DIST_MIRROR
             fnm install --lts ||
                 echo "warning: fnm install --lts failed" >&2
             fnm default lts-latest ||
@@ -360,6 +364,10 @@ brew_install_missing cask $BREW_CASKS
 missing=""
 if command -v fnm >/dev/null 2>&1; then
     echo "==> installing Node.js LTS with fnm (not with Homebrew)"
+    # fnm downloads from nodejs.org by default; use the TUNA mirror, the same
+    # one the apt and ELPA setup targets.
+    FNM_NODE_DIST_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/
+    export FNM_NODE_DIST_MIRROR
     fnm install --lts ||
         echo "warning: fnm install --lts failed" >&2
     fnm default lts-latest ||

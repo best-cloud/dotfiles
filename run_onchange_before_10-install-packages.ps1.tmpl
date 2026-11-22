@@ -77,6 +77,10 @@ $fnmCmd = @(
 # they are missing, so chezmoi reports the failure and retries on the next apply
 # instead of recording a partially applied machine as complete.
 $missing = @()
+# fnm downloads Node.js from nodejs.org by default. Use the TUNA mirror, the
+# same one the apt and ELPA setup targets; fish and the PS7 profile set this
+# too, but a fresh machine has not loaded them when this script runs.
+$env:FNM_NODE_DIST_MIRROR = 'https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/'
 if ($fnmCmd) {
     Write-Host 'installing: Node.js LTS (fnm)'
     & $fnmCmd install --lts

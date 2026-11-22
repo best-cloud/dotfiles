@@ -107,6 +107,10 @@ this file only records what agents otherwise get wrong.
   winget; all three then run `fnm install --lts` and
   `fnm default lts-latest`. Do not add `nodejs`/`npm` back to PACKAGES, `node`
   to BREW_PACKAGES, or the `prettier` formula (it depends on Homebrew Node.js).
+  fnm downloads from nodejs.org unless `FNM_NODE_DIST_MIRROR` is set, so all
+  three install branches plus fish and the PS7 profile point it at the TUNA
+  mirror `https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/` (keep the
+  trailing slash; fnm appends `index.json` and the version directories).
   fish sources `fnm env --use-on-cd` and the PS7 profile runs
   `fnm env --use-on-cd --shell powershell`. Spacemacs does not use Node.js, so
   nothing in `dot_spacemacs` should grow a `node` dependency.
