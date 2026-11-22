@@ -323,9 +323,9 @@ TUNA may lag behind the official security archive by a few minutes; switch the
 security suite back to `http://security.ubuntu.com/ubuntu` in the script if a
 production machine needs immediate security updates.
 
-## PyPI and Homebrew mirrors (TUNA)
+## PyPI, Homebrew and npm mirrors
 
-The same TUNA mirror serves the package managers that are not managed by apt:
+The package managers that apt does not drive use mirrors too:
 
 - **uv / PyPI** — `dot_config/uv/uv.toml` (Unix) and
   `AppData/Roaming/uv/uv.toml` (Windows, because uv ignores XDG there) set
@@ -341,6 +341,13 @@ The same TUNA mirror serves the package managers that are not managed by apt:
   (`https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles`), and the macOS fish
   block sets them for interactive shells. Formula metadata and bottles
   therefore come from TUNA instead of GitHub.
+- **npm** — TUNA no longer mirrors npm, so `prettier` and `aws-cdk` install
+  through npmmirror (Alibaba) with
+  `npm_config_registry=https://registry.npmmirror.com/`. fish and the PowerShell
+  profile export it for interactive use, and the install scripts set it for the
+  first apply. It is an environment variable rather than a managed `~/.npmrc`
+  so npm's own `allow-scripts` allowlist (which `@opencode/cli` needs) survives;
+  override it per command with `--registry=https://registry.npmjs.org/`.
 - **Node.js** — covered in [Node.js, prettier and linters](#nodejs-prettier-and-linters).
 
 ## Repository layout

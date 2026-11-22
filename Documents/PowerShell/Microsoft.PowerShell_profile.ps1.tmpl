@@ -31,8 +31,10 @@ if (Test-Path $denoBin) {
 # Node.js is managed by fnm on every platform. `--use-on-cd` switches versions
 # automatically in directories with a .node-version or .nvmrc file. fnm
 # downloads from nodejs.org by default; use the TUNA mirror, the same one the
-# apt and ELPA setup targets, for reliable downloads in China.
+# apt and ELPA setup targets, for reliable downloads in China. TUNA no longer
+# mirrors npm, so npm packages (prettier, aws-cdk) come from npmmirror.
 $env:FNM_NODE_DIST_MIRROR = 'https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/'
+$env:npm_config_registry = 'https://registry.npmmirror.com/'
 if (Get-Command fnm -ErrorAction SilentlyContinue) {
     fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression
 }

@@ -194,7 +194,11 @@ this file only records what agents otherwise get wrong.
   install branch exports `HOMEBREW_API_DOMAIN` and `HOMEBREW_BOTTLE_DOMAIN`
   from `homebrew-bottles`, and the macOS fish block sets both for interactive
   shells. Do not add `HOMEBREW_BREW_GIT_REMOTE`/`HOMEBREW_CORE_GIT_REMOTE`: brew
-  4+ installs from the API, so the two variables above are enough.
+  4+ installs from the API, so the two variables above are enough. TUNA no
+  longer mirrors npm, so npm packages go through npmmirror via
+  `npm_config_registry` (fish, the PS7 profile and both install scripts). Keep
+  it an environment variable rather than a managed `~/.npmrc`: managing that
+  file would drop npm's `allow-scripts` allowlist, which `@opencode/cli` needs.
 - Prefer template data (`.name`, `.email`, `.editor`, `.isWSL`, `.isMacOS`,
   `.isWindows`) over per-OS duplicate files.
 

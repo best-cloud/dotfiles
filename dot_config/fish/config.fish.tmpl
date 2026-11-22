@@ -37,6 +37,9 @@ fish_add_path --global ~/.deno/bin
 # fnm downloads Node.js from nodejs.org by default. Use the TUNA mirror, the
 # same one the apt and ELPA setup targets, for reliable downloads in China.
 set -gx FNM_NODE_DIST_MIRROR https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/
+# TUNA no longer mirrors npm, so packages (prettier, aws-cdk) come from
+# npmmirror through npm's npm_config_registry setting.
+set -gx npm_config_registry https://registry.npmmirror.com/
 
 # Put the default Node.js (and its npm) on PATH; --use-on-cd switches versions
 # automatically when a directory has a .node-version or .nvmrc file.
