@@ -83,29 +83,32 @@ shfmt
 shellcheck
 "
 
-# WSL starts without systemd on the first bootstrap. openssh-server's postinst
-# calls systemctl, which fails there and leaves dpkg unable to configure any
-# later package. Defer it to run_after_45-wsl-ssh.sh.tmpl, which runs
-# after `wsl --shutdown` starts systemd; remove a half-configured package now
-# so the rest of this apt transaction still succeeds.
-if grep -qi microsoft /proc/version 2>/dev/null && [ ! -d /run/systemd/system ]; then
-    PACKAGES=$(printf '%s\n' "$PACKAGES" | grep -vx openssh-server)
-    if dpkg -s openssh-server >/dev/null 2>&1; then
-        status=$(dpkg -s openssh-server 2>/dev/null | awk -F': ' '$1 == "Status" { print $2 }')
-        case "$status" in
-        *unpacked* | *half-configured* | *half-installed*)
-            echo "==> removing half-configured openssh-server until WSL restarts with systemd" >&2
-            as_root dpkg --remove --force-remove-reinstreq openssh-server ||
-                echo "warning: could not remove the half-configured openssh-server" >&2
-            ;;
-        esac
+# WSL starts without systemd on the first bootstrap. Debian service maintainer
+# scripts call systemctl, which fails there and leaves packages half-configured;
+# every later apt transaction then fails too. A no-op systemctl lets dpkg
+# configure openssh-server; its ssh.socket drop-ins take effect after
+# `wsl --shutdown` starts systemd.
+fake_systemd_bin=""
+cleanup_fake_systemd() {
+    if [ -n "$fake_systemd_bin" ]; then
+        rm -rf "$fake_systemd_bin"
     fi
+}
+trap cleanup_fake_systemd EXIT
+if grep -qi microsoft /proc/version 2>/dev/null && [ ! -d /run/systemd/system ]; then
+    fake_systemd_bin=$(mktemp -d)
+    printf '#!/bin/sh\nexit 0\n' >"$fake_systemd_bin/systemctl"
+    chmod +x "$fake_systemd_bin/systemctl"
+    PATH="$fake_systemd_bin:$PATH"
+    export PATH
 fi
 
 echo "==> apt-get update"
 # A mirror hiccup should not abort the whole bootstrap while usable package
 # indexes are still cached; the install step below will report real failures.
-as_root env DEBIAN_FRONTEND=noninteractive apt-get update -y ||
+# Pass PATH explicitly through sudo so maintainer scripts see the fake
+# systemctl instead of sudo's secure_path.
+as_root env DEBIAN_FRONTEND=noninteractive PATH="$PATH" apt-get update -y ||
     echo "warning: apt-get update failed; using cached package indexes" >&2
 
 available=""
@@ -127,12 +130,12 @@ done
 if [ -n "$available" ]; then
     echo "==> apt-get install:$available"
     # shellcheck disable=SC2086  # word splitting of the package list is intended
-    if ! as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $available; then
+    if ! as_root env DEBIAN_FRONTEND=noninteractive PATH="$PATH" apt-get install -y --no-install-recommends $available; then
         # One unavailable or conflicted package must not block every other
         # package in the list, so retry the batch one package at a time.
         echo "warning: batch install failed; retrying each package separately" >&2
         for pkg in $available; do
-            as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$pkg" ||
+            as_root env DEBIAN_FRONTEND=noninteractive PATH="$PATH" apt-get install -y --no-install-recommends "$pkg" ||
                 echo "warning: $pkg installation failed" >&2
         done
     fi

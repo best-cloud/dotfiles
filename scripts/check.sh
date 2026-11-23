@@ -249,7 +249,7 @@ mkdir -p "$tmp/bodies"
 while IFS= read -r src; do
     rel=${src#"$ROOT"/}
     case "$rel" in
-    *.ps1.tmpl | run_onchange_after_20-macos-defaults.sh.tmpl | run_after_45-wsl-ssh.sh.tmpl | run_onchange_after_50-optional-apps.sh.tmpl | run_onchange_after_50-optional-apps-linux.sh.tmpl) ;;
+    *.ps1.tmpl | run_onchange_after_20-macos-defaults.sh.tmpl | run_onchange_after_45-wsl-ssh.sh.tmpl | run_onchange_after_50-optional-apps.sh.tmpl | run_onchange_after_50-optional-apps-linux.sh.tmpl) ;;
     *) continue ;;
     esac
     out="$tmp/bodies/$(printf '%s' "$rel" | sed 's|/|__|g; s|\.tmpl$||')"

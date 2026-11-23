@@ -149,8 +149,7 @@ fi
 
 echo
 if running_in_wsl; then
-    echo "==> done. Run 'wsl --shutdown' from Windows, reopen Ubuntu, then run 'chezmoi apply' once more"
-    echo "    (it installs openssh-server now that systemd is running), then start a new shell or run: exec fish"
+    echo "==> done. Run 'wsl --shutdown' from Windows, reopen Ubuntu, and start a new shell (or run: exec fish)."
 else
     echo "==> done. Start a new shell to use fish, or run: exec fish"
 fi

@@ -84,12 +84,13 @@ On WSL2, `bootstrap.sh` also enables systemd by merging `systemd=true` into the
 `[boot]` section of `/etc/wsl.conf`; the rest of the file (`[automount]`,
 `[interop]`, `[user]`, …) is preserved and the edit is skipped when it is already
 correct. WSL reads this file only when the distribution starts, so run
-`wsl --shutdown` from Windows and reopen Ubuntu afterwards. The first WSL
-bootstrap has no systemd, so it defers `openssh-server`; reopen WSL and run
-`chezmoi apply` once more to install it and apply the SSH port configuration.
-If Ollama was installed during the same bootstrap, enable its service after the
-restart with `sudo systemctl enable --now ollama` (the installer writes the
-unit but cannot enable it while systemd is not running).
+`wsl --shutdown` from Windows and reopen Ubuntu afterwards. The first WSL apply
+has no systemd, so its apt phase uses a temporary no-op `systemctl` to let
+packages such as `openssh-server` finish configuring; the socket and service
+drop-ins take effect after the restart. If Ollama was installed during the same
+bootstrap, enable its service after the restart with
+`sudo systemctl enable --now ollama` (the installer writes the unit but cannot
+enable it while systemd is not running).
 
 ### Repository URL
 
@@ -216,18 +217,19 @@ ssh <windows-user>@<windows-lan-ip>
 ```
 
 WSL2 Ubuntu separately serves SSH on **port 2222**. The Linux package list
-includes `openssh-server` for Ubuntu Server. On WSL the first boot has no
-systemd, so the hash-gated package script defers `openssh-server` and removes a
-half-configured copy; `run_after_45-wsl-ssh.sh.tmpl` retries the install
-after `wsl --shutdown` starts systemd, then writes
-`/etc/ssh/sshd_config.d/00-chezmoi-wsl.conf` with `Port 2222`. Ubuntu 26.04+
+includes `openssh-server`. On WSL the first boot has no systemd, so the package
+script prepends a temporary no-op `systemctl` to `PATH` while apt runs; that
+lets `openssh-server` finish configuring instead of leaving dpkg broken.
+`run_onchange_after_45-wsl-ssh.sh.tmpl` writes
+`/etc/ssh/sshd_config.d/00-chezmoi-wsl.conf` with `Port 2222` and ensures the
+socket is enabled for the next boot. Ubuntu 26.04+
 starts SSH from `ssh.socket`, so the script also writes
-`/etc/systemd/system/ssh.socket.d/zz-chezmoi-port.conf` and restarts
-`ssh.socket` (the `zz-` prefix keeps the override after systemd's generated
-`addresses.conf`). This targets Ubuntu 26.04+ and assumes systemd socket
-activation. The script is a no-op on Ubuntu Server, so a server keeps its normal
-SSH port. Port 2222 avoids colliding with the Windows OpenSSH server, which
-normally owns port 22.
+`/etc/systemd/system/ssh.socket.d/zz-chezmoi-port.conf` and, when systemd is
+running, restarts `ssh.socket` (the `zz-` prefix keeps the override after
+systemd's generated `addresses.conf`). This targets Ubuntu 26.04+ and assumes
+systemd socket activation. The script is a no-op on Ubuntu Server, so a server
+keeps its normal SSH port. Port 2222 avoids colliding with the Windows OpenSSH
+server, which normally owns port 22.
 
 On the Windows side, `dot_wslconfig` sets `networkingMode=mirrored` so WSL2
 shares the Windows host's network interfaces. WSL only reads `.wslconfig` when
@@ -255,7 +257,7 @@ Windows and WSL2 can be reached at the same LAN address because they listen on
 different ports. mosh uses the WSL SSH connection on port 2222 and then switches
 to its UDP port. Keep Windows on 22 and WSL on 2222; if one side is moved,
 update `run_onchange_after_35-windows-ssh.ps1.tmpl`,
-`run_after_45-wsl-ssh.sh.tmpl` and the firewall rules together.
+`run_onchange_after_45-wsl-ssh.sh.tmpl` and the firewall rules together.
 
 Ubuntu 26.04 packages Starship 1.22.1, but the shipped
 `catppuccin-powerline` preset uses `jj_bookmark`, added in Starship 1.27.0.
@@ -517,7 +519,7 @@ and keeps Markdown trailing spaces.
 ├── run_onchange_after_30-spacemacs.ps1.tmpl           # clone Spacemacs (Windows)
 ├── run_onchange_after_35-windows-ssh.ps1.tmpl         # Windows OpenSSH on 22, pwsh 7
 ├── run_onchange_after_40-wsl.ps1.tmpl                 # WSL2 + Ubuntu + firewall
-├── run_after_45-wsl-ssh.sh.tmpl                # WSL2 sshd on port 2222 (retries openssh)
+├── run_onchange_after_45-wsl-ssh.sh.tmpl                # WSL2 sshd on port 2222 (retries openssh)
 ├── run_onchange_after_50-optional-apps.sh.tmpl        # optional macOS apps
 ├── run_onchange_after_50-optional-apps-linux.sh.tmpl  # optional Linux CLI apps
 └── run_onchange_after_50-optional-apps.ps1.tmpl       # optional Windows apps
@@ -528,9 +530,7 @@ and keeps Markdown trailing spaces.
 The installers are `run_onchange_` scripts: chezmoi hashes the rendered content
 and re-runs a script only when it changes. Add a package to a list, run
 `chezmoi apply`, and it installs just that package (all scripts are
-idempotent). The WSL SSH script uses `run_` (always) instead, because the first
-WSL boot cannot configure `openssh-server` before systemd exists and a later
-`chezmoi apply` must retry it.
+idempotent).
 
 Individual downloads stay best-effort so one failure does not block the rest of
 the list. The tools with no distro package (Node.js from fnm, prettier, AWS CDK)
@@ -1060,19 +1060,17 @@ chezmoi verify
   active. The mosh UDP range 60000-61000 must not be blocked by a network
   firewall between the client and Windows.
 - **WSL apt reports a half-configured `openssh-server`** — the first WSL boot
-  runs before systemd, so the package script defers `openssh-server` rather
-  than leaving dpkg broken. Run `wsl --shutdown` from Windows, reopen Ubuntu,
-  and run `chezmoi apply` again; `run_after_45-wsl-ssh.sh.tmpl` installs
-  it and configures port 2222. If apt reports a half-configured package from an
-  older run, the next applied package script removes it and the always-run SSH
-  script reinstalls it after systemd starts. If removal is refused, run
-  `sudo dpkg --remove --force-remove-reinstreq openssh-server` manually, then
-  `wsl --shutdown` and re-apply.
+  has no systemd, so the package script runs apt with a temporary no-op
+  `systemctl`; this lets the postinst finish instead of leaving dpkg broken.
+  For an older half-configured state, run `wsl --shutdown` from Windows,
+  reopen Ubuntu, then `sudo dpkg --configure -a` (or
+  `sudo apt-get install -f`) and `chezmoi apply`. The SSH socket takes effect
+  after the restart.
 - **WSL sshd fails with `Address already in use`** — another WSL distribution,
   a leftover `sshd`, or a manually re-ported Windows sshd already holds port
   2222. Check with `Get-NetTCPConnection -LocalPort 2222 -State Listen` in
   PowerShell, then move the other listener or change the WSL port in
-  `run_after_45-wsl-ssh.sh.tmpl` and the firewall rules.
+  `run_onchange_after_45-wsl-ssh.sh.tmpl` and the firewall rules.
 - **Spacemacs did not clone** — check `chezmoi apply` output. A pre-existing
   `~/.emacs.d` that is not a git checkout is intentionally left alone, and the
   clone needs git plus network access. An existing checkout on another branch

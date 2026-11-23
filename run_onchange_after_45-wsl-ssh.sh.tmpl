@@ -1,54 +1,34 @@
 {{ if eq .chezmoi.os "linux" -}}
 #!/bin/sh
-# WSL2 Ubuntu (26.04+) only: install openssh-server once systemd is available,
-# then serve SSH on port 2222.
+# WSL2 Ubuntu (26.04+) only: serve SSH on port 2222.
 #
-# This is a run_ (always) script: the first WSL apply has no systemd, so
-# openssh-server cannot configure there and is deferred. Every later apply
-# retries the install before configuring the port. Mirrored WSL networking
-# (dot_wslconfig) puts the distribution on the Windows host's interfaces, so
-# LAN clients can reach sshd and mosh-server directly. Port 2222 avoids
-# colliding with the Windows OpenSSH server, which normally owns port 22. The
-# Windows firewall rules are created by run_onchange_after_40-wsl.ps1.tmpl.
-# Rendered on Linux and exits immediately on Ubuntu Server.
+# Mirrored WSL networking (dot_wslconfig) puts the distribution on the Windows
+# host's network interfaces, so LAN clients can reach sshd and mosh-server
+# directly. Port 2222 avoids colliding with the Windows OpenSSH server, which
+# normally owns port 22. The Windows firewall rules are created by
+# run_onchange_after_40-wsl.ps1.tmpl. Rendered on Linux and exits immediately
+# on Ubuntu Server.
 set -eu
 
 {{ include "scripts/lib/shell.sh" }}
 [ -r /proc/version ] || exit 0
 grep -qi microsoft /proc/version || exit 0
 
-if ! can_root; then
-    echo "warning: sudo is required to install and configure the WSL sshd; skipping" >&2
-    exit 0
-fi
-
-# openssh-server is installed here rather than in the hash-gated package script
-# because its postinst calls systemctl, which fails before the first
-# `wsl --shutdown` starts systemd. apt leaves the package half-configured and
-# every other apt transaction then fails until it is configured.
-if ! dpkg -s openssh-server 2>/dev/null | grep -q '^Status: install ok installed'; then
-    if [ ! -d /run/systemd/system ]; then
-        echo "openssh-server will be installed after 'wsl --shutdown' restarts WSL with systemd" >&2
-        exit 0
-    fi
-    echo "==> installing openssh-server (systemd is running)"
-    as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server ||
-        {
-            echo "warning: openssh-server installation failed; will retry on the next apply" >&2
-            exit 0
-        }
-fi
-
 if ! native_cmd sshd; then
     echo "warning: openssh-server is not installed; skipping the WSL sshd port change" >&2
     exit 0
 fi
 
-if [ ! -d /etc/ssh/sshd_config.d ]; then
+if ! can_root; then
+    echo "warning: sudo is required to change the WSL sshd port; skipping" >&2
+    exit 0
+fi
+
+if ! as_root test -d /etc/ssh/sshd_config.d; then
     echo "warning: /etc/ssh/sshd_config.d is missing; skipping the WSL sshd port change" >&2
     exit 0
 fi
-if ! grep -Eq '^[[:space:]]*Include[[:space:]]+/etc/ssh/sshd_config\.d/\*\.conf' /etc/ssh/sshd_config; then
+if ! as_root grep -Eq '^[[:space:]]*Include[[:space:]]+/etc/ssh/sshd_config\.d/\*\.conf' /etc/ssh/sshd_config; then
     echo "warning: /etc/ssh/sshd_config does not include sshd_config.d; skipping the WSL sshd port change" >&2
     exit 0
 fi
@@ -66,7 +46,7 @@ trap 'rm -f "$tmp"' EXIT
 } >"$tmp"
 
 changed=0
-if [ -f "$ssh_config" ] && cmp -s "$tmp" "$ssh_config"; then
+if [ -f "$ssh_config" ] && as_root cmp -s "$tmp" "$ssh_config"; then
     :
 else
     if [ -f "$ssh_config" ] && [ ! -f "${ssh_config}.orig" ]; then
@@ -90,7 +70,7 @@ fi
 } >"$tmp"
 
 socket_changed=0
-if [ -f "$socket_config" ] && cmp -s "$tmp" "$socket_config"; then
+if [ -f "$socket_config" ] && as_root cmp -s "$tmp" "$socket_config"; then
     :
 else
     if [ -f "$socket_config" ] && [ ! -f "${socket_config}.orig" ]; then
@@ -102,18 +82,6 @@ fi
 
 rm -f "$tmp"
 trap - EXIT
-
-# On a steady-state machine, avoid prompting for sudo on every apply. This is a
-# run_ (always) script, so the common case must be a no-op without root.
-if [ "$changed" -eq 0 ] && [ "$socket_changed" -eq 0 ]; then
-    if [ ! -d /run/systemd/system ]; then
-        exit 0
-    fi
-    if systemctl is-enabled --quiet ssh.socket 2>/dev/null &&
-        systemctl is-active --quiet ssh.socket 2>/dev/null; then
-        exit 0
-    fi
-fi
 
 if ! as_root sshd -t; then
     echo "error: sshd rejected $ssh_config; not restarting the service" >&2
@@ -128,6 +96,14 @@ case "$sshd_ports" in
     echo "         remove other Port directives from /etc/ssh/sshd_config*" >&2
     ;;
 esac
+
+# The package normally enables ssh.socket. When it configured without a live
+# systemd, make sure the socket is still enabled for the next boot.
+if [ ! -e /etc/systemd/system/sockets.target.wants/ssh.socket ]; then
+    as_root mkdir -p /etc/systemd/system/sockets.target.wants
+    as_root ln -sf /usr/lib/systemd/system/ssh.socket \
+        /etc/systemd/system/sockets.target.wants/ssh.socket
+fi
 
 # WSL starts systemd only after `wsl --shutdown` following the bootstrap's
 # /etc/wsl.conf change. Write the files now; the socket picks them up then.
@@ -149,7 +125,7 @@ else
     as_root systemctl start ssh.socket || true
 fi
 
-if ! ss -ltn 2>/dev/null | awk '{ print $4 }' | grep -Eq '[:.]2222$'; then
+if ! as_root ss -ltn 2>/dev/null | awk '{ print $4 }' | grep -Eq '[:.]2222$'; then
     echo "warning: no SSH listener on 2222; check ssh.socket" >&2
 fi
 
