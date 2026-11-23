@@ -46,8 +46,11 @@ if ($capability.State -eq 'Installed') {
 # package, whose family path is stable but lives under WindowsApps.
 $pwsh = Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe'
 if (-not (Test-Path -LiteralPath $pwsh)) {
+    # Exclude the Store execution alias under
+    # %LOCALAPPDATA%\Microsoft\WindowsApps: sshd cannot reliably launch that
+    # alias. The real MSIX package path is resolved by Get-AppxPackage below.
     $pwsh = Get-Command pwsh.exe -All -ErrorAction SilentlyContinue |
-        Where-Object { $_.Source -and $_.Source -notlike '*\WindowsApps\pwsh.exe' } |
+        Where-Object { $_.Source -and $_.Source -notlike '*\Microsoft\WindowsApps\*' } |
         Select-Object -First 1 -ExpandProperty Source
 }
 if (-not $pwsh -or -not (Test-Path -LiteralPath $pwsh)) {

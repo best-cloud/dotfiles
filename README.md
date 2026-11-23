@@ -962,6 +962,13 @@ chezmoi verify
   `git add --renormalize . && git checkout -- .`. `core.autocrlf=true` alone is
   not enough: `.gitattributes` sets `eol=lf` for every text file, which is what
   keeps the POSIX scripts and `.shellcheckrc` working on Windows.
+- **`chezmoi` asks whether to overwrite `.gitconfig`** — a package installer
+  (typically Git LFS for Windows) edited it after the last apply. The managed
+  config already contains the LFS clean/smudge/process filters, so accepting
+  chezmoi's version is safe; use `chezmoi apply --force` or answer yes.
+- **`direnv` throws on Windows PowerShell 5.1** — the hook requires PowerShell
+  7.2+, so the profile only loads it there. If the error persists, the 5.1
+  profile is stale; run `chezmoi apply` and open a new PowerShell window.
 - **Nothing re-runs after editing a script** — only rendered content changes
   trigger `run_onchange_`. Delete the script's `entryState` key as shown above
   to force a run.

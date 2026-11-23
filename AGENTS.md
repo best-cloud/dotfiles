@@ -255,7 +255,8 @@ behavior; this file only records what agents otherwise get wrong.
   and WezTerm read `~/.config`. Removing them silently breaks all four. It also
   exports `BAT_CONFIG_PATH`, `RIPGREP_CONFIG_PATH`, `GH_CONFIG_DIR` and
   `LG_CONFIG_FILE`, `DO_NOT_TRACK`, and `POWERSHELL_TELEMETRY_OPTOUT`, hooks
-  direnv, maps Ctrl+R/Ctrl+T to fzf when available, and forces UTF-8 output.
+  direnv only on PowerShell 7.2+ (the 5.1 shim loads this file too), maps
+  Ctrl+R/Ctrl+T to fzf when available, and forces UTF-8 output.
   It sets `SHELL` (`pwsh` on 7, `powershell` on 5.1) so Zellij panes do not
   fall back to `cmd.exe`; keep the version check because 5.1 dot-sources this
   file. It also adds `%APPDATA%\npm` to `PATH` (npm global installs of prettier

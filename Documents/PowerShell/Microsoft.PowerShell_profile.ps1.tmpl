@@ -142,8 +142,13 @@ if (Get-Command zoxide -ErrorAction SilentlyContinue) {
 # ---------------------------------------------------------------------------
 # direnv: load .envrc files automatically
 # ---------------------------------------------------------------------------
-if (Get-Command direnv -ErrorAction SilentlyContinue) {
-    Invoke-Expression (& { (direnv hook pwsh | Out-String) })
+# direnv's PowerShell hook requires 7.2+. The Windows PowerShell 5.1 shim
+# dot-sources this profile too, so skip the hook there instead of throwing a
+# terminating error during profile load.
+if ($PSVersionTable.PSVersion -ge [version]'7.2') {
+    if (Get-Command direnv -ErrorAction SilentlyContinue) {
+        Invoke-Expression (& { (direnv hook pwsh | Out-String) })
+    }
 }
 
 # ---------------------------------------------------------------------------
