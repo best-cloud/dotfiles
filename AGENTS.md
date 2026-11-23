@@ -296,13 +296,14 @@ behavior; this file only records what agents otherwise get wrong.
   elevated.
 - `dot_wslconfig` is the Windows-only target `~/.wslconfig` and must stay under
   the non-Windows branch of `.chezmoiignore`. It sets
-  `networkingMode=mirrored`, which puts the WSL2 distribution on the Windows
-  host's interfaces; `autoMemoryReclaim=gradual`, `sparseVhd`, `firewall` and
-  `hostAddressLoopback` are part of the same low-risk baseline. Do not add
-  `dnsTunneling` or `autoProxy`: this machine's VPN runs on the router, so WSL
-  should use the host's normal DNS and proxy behavior. WSL reads the file only
-  when a distribution starts, so `wsl --shutdown` is required after it changes.
-  The same 40 script creates inbound Windows Firewall **and** Hyper-V firewall
+  `networkingMode=mirrored` and `firewall=true`, which puts the WSL2
+  distribution on the Windows host's interfaces;
+  `autoMemoryReclaim=gradual`, `sparseVhd` and `hostAddressLoopback` belong in
+  `[experimental]` on current WSL builds. Do not add `dnsTunneling` or
+  `autoProxy`: this machine's VPN runs on the router, so WSL should use the
+  host's normal DNS and proxy behavior. WSL reads the file only when a
+  distribution starts, so `wsl --shutdown` is required after it changes. The
+  same 40 script creates inbound Windows Firewall **and** Hyper-V firewall
   rules for TCP 2222 (SSH) and UDP 60000-61000 (mosh), because mirrored mode is
   filtered by both. The rules use the `Any` profile; do not remove the
   elevated-shell warning, and keep the
