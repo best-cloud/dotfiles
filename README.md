@@ -387,7 +387,9 @@ production machine needs immediate security updates.
 
 ## PyPI, Homebrew and npm mirrors
 
-The package managers that apt does not drive use mirrors too:
+The package managers that apt does not drive use mirrors too.
+`PACKAGE-MANAGER-MIRRORS.md` records how each ecosystem keeps a mirror out of
+its lockfile, and the pending uv `proxy-index` migration.
 
 - **uv / PyPI** — `dot_config/uv/uv.toml` (Unix) and
   `AppData/Roaming/uv/uv.toml` (Windows, because uv ignores XDG there) set

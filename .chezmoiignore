@@ -1,6 +1,7 @@
 # Files that live in the repo but should not be copied into the home directory.
 README.md
 AGENTS.md
+PACKAGE-MANAGER-MIRRORS.md
 bootstrap.sh
 bootstrap.sh.tmpl
 bootstrap.ps1
