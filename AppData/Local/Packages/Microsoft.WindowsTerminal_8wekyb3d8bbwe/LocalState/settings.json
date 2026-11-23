@@ -12,6 +12,10 @@
     "initialRows": 44,
     "alwaysShowTabs": false,
     "showTabsInTitlebar": true,
+    "tabWidthMode": "compact",
+    "copyOnSelect": true,
+    "copyFormatting": "none",
+    "trimPaste": true,
     "theme": "Catppuccin Mocha",
     "profiles":
     {

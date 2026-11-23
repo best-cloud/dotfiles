@@ -4,20 +4,30 @@
 #   irm https://raw.githubusercontent.com/best-cloud/dotfiles/main/bootstrap.ps1 | iex
 #
 # Usage (from a local checkout):
-#   powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1
+#   powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 [-Repo URL] [-Ref REF]
 #
-# Set -Repo to override the repository URL.
+# Set -Repo or CHEZMOI_REPO to override the repository URL, and -Ref or
+# CHEZMOI_REF to apply a branch or tag from the cloned repository.
 #
 # Generated from bootstrap.ps1.tmpl by scripts/render-bootstrap.sh. Edit the
 # template or scripts/lib/*.ps1 instead of this file.
 #Requires -Version 5.1
 [CmdletBinding()]
 param(
-    [ValidateNotNullOrEmpty()]
-    [string]$Repo = 'https://github.com/best-cloud/dotfiles.git'
+    [string]$Repo = $env:CHEZMOI_REPO,
+    [string]$Ref = $env:CHEZMOI_REF
 )
 
 $ErrorActionPreference = 'Stop'
+
+$repoExplicit = $PSBoundParameters.ContainsKey('Repo') -or [bool]$env:CHEZMOI_REPO
+if (-not $Repo) {
+    $Repo = 'https://github.com/best-cloud/dotfiles.git'
+}
+
+if ([Environment]::OSVersion.Version.Build -lt 22000) {
+    Write-Warning 'This repository targets Windows 11 26H2+; older Windows builds may miss required features.'
+}
 
 # Add a directory to the current process PATH once.
 #
@@ -131,13 +141,22 @@ if (-not (Get-Command chezmoi -ErrorAction SilentlyContinue)) {
     throw 'chezmoi installation failed. Install it with: winget install twpayne.chezmoi'
 }
 
-# Prefer a local checkout when this script is run from one.
-if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot '.chezmoi.toml.tmpl'))) {
+# Prefer a local checkout when this script is run from one, unless the repo was
+# set explicitly with -Repo/CHEZMOI_REPO.
+if (-not $repoExplicit -and $PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot '.chezmoi.toml.tmpl'))) {
+    if ($Ref) {
+        Write-Warning '-Ref applies to cloned sources; ignoring it for the local checkout at $PSScriptRoot'
+    }
     Write-Host "==> applying dotfiles from $PSScriptRoot"
     chezmoi init --apply --source $PSScriptRoot
 } else {
-    Write-Host "==> applying dotfiles from $Repo"
-    chezmoi init --apply $Repo
+    $initArgs = @('init', '--apply', $Repo)
+    if ($Ref) {
+        $initArgs += @('--branch', $Ref)
+    }
+    $label = if ($Ref) { "$Repo ($Ref)" } else { $Repo }
+    Write-Host "==> applying dotfiles from $label"
+    chezmoi @initArgs
 }
 
 if ($LASTEXITCODE -ne 0) {
@@ -146,3 +165,4 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ''
 Write-Host '==> done. Open a new Windows Terminal tab to use the new profile.'
+Write-Host '    For the WSL2 setup, run "wsl --shutdown" once and reopen Ubuntu.'

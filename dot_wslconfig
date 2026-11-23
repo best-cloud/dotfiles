@@ -5,3 +5,14 @@
 # Run `wsl --shutdown` from Windows after this file changes.
 [wsl2]
 networkingMode=mirrored
+# Give unused guest memory back to Windows gradually instead of holding a fixed
+# VM cap; the default WSL VM otherwise keeps several GB after a build.
+autoMemoryReclaim=gradual
+# Grow the virtual disk on demand and shrink it when files are deleted.
+sparseVhd=true
+firewall=true
+
+[experimental]
+# With mirrored mode the host can also reach WSL services through the Windows
+# IP, not only through localhost; useful for containers and LAN testing.
+hostAddressLoopback=true

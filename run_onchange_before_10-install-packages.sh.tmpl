@@ -36,12 +36,15 @@ STARSHIP_MIN_VERSION=1.27.0
 # bsdextrautils provides col, which fish's MANPAGER pipeline uses to strip
 # overstrike codes before bat renders a man page. openssh-server provides the
 # WSL2 sshd (configured on port 2222 by run_onchange_after_45-wsl-ssh.sh.tmpl);
-# it is Linux-only because macOS and Windows have their own SSH servers.
+# it is Linux-only because macOS and Windows have their own SSH servers. wslu
+# provides wslview so BROWSER opens URLs in the Windows browser; it only exists
+# in the WSL2 distribution.
 PACKAGES="
 ca-certificates
 curl
 wget
 git
+git-lfs
 build-essential
 unzip
 zip
@@ -68,6 +71,7 @@ awscli
 starship
 lazygit
 zellij
+git-delta
 podman
 uv
 ruff
@@ -77,10 +81,14 @@ fnm
 prettier
 shfmt
 shellcheck
+{{ if .isWSL }}wslu{{ end }}
 "
 
 echo "==> apt-get update"
-as_root env DEBIAN_FRONTEND=noninteractive apt-get update -y
+# A mirror hiccup should not abort the whole bootstrap while usable package
+# indexes are still cached; the install step below will report real failures.
+as_root env DEBIAN_FRONTEND=noninteractive apt-get update -y ||
+    echo "warning: apt-get update failed; using cached package indexes" >&2
 
 available=""
 unavailable=""
@@ -101,8 +109,28 @@ done
 if [ -n "$available" ]; then
     echo "==> apt-get install:$available"
     # shellcheck disable=SC2086  # word splitting of the package list is intended
-    as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $available
+    if ! as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $available; then
+        # One unavailable or conflicted package must not block every other
+        # package in the list, so retry the batch one package at a time.
+        echo "warning: batch install failed; retrying each package separately" >&2
+        for pkg in $available; do
+            as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$pkg" ||
+                echo "warning: $pkg installation failed" >&2
+        done
+    fi
 fi
+
+# Ubuntu renames the upstream fd and bat binaries to fdfind and batcat. Link
+# them into ~/.local/bin (first in PATH) so scripts, fzf, Emacs, Zellij and
+# non-fish shells get the usual names too; the fish wrappers remain as a
+# fallback for machines installed before this link existed.
+for pair in fd:fdfind bat:batcat; do
+    link_name=${pair%%:*}
+    link_target=${pair#*:}
+    if [ ! -e "$HOME/.local/bin/$link_name" ] && native_cmd "$link_target"; then
+        ln -sf "$(command -v "$link_target")" "$HOME/.local/bin/$link_name"
+    fi
+done
 
 # Fall back to the upstream installer only for tools that this Ubuntu release
 # does not package. Downloads are best-effort so a transient network error does
@@ -249,6 +277,14 @@ elif ! has cdk; then
     missing="$missing aws-cdk"
 fi
 
+# git-lfs is mandatory (the managed .gitconfig defines its clean/smudge
+# filters), so a failed apt install must fail this run instead of being
+# recorded as a successful apply.
+if ! has git-lfs; then
+    echo "warning: git-lfs is missing; LFS repositories will fail to check out" >&2
+    missing="$missing git-lfs"
+fi
+
 # Ubuntu 26.04 packages Starship 1.22.1, which predates jj_bookmark and prints
 # an "Unknown key" warning on every prompt. Upgrade in place; ~/.local/bin is
 # first in PATH, so the newer binary shadows /usr/bin/starship.
@@ -305,6 +341,7 @@ fi
 
 BREW_PACKAGES="
 git
+git-lfs
 fish
 starship
 ripgrep
@@ -326,6 +363,7 @@ direnv
 gh
 awscli
 lazygit
+git-delta
 podman
 uv
 ruff
@@ -423,6 +461,13 @@ if command -v fnm >/dev/null 2>&1; then
 else
     echo "warning: fnm is unavailable; Node.js, prettier and aws-cdk were not installed" >&2
     missing="$missing fnm"
+fi
+
+# git-lfs is mandatory: the managed .gitconfig defines its clean/smudge
+# filters, so a failed Homebrew install must fail this run.
+if ! command -v git-lfs >/dev/null 2>&1; then
+    echo "warning: git-lfs is missing; LFS repositories will fail to check out" >&2
+    missing="$missing git-lfs"
 fi
 
 if [ -n "$missing" ]; then

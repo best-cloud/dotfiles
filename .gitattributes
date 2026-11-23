@@ -1,4 +1,8 @@
-* text=auto
+# Everything in this repository is LF in the index and in the working tree.
+# The targets are consumed by chezmoi on Linux, macOS and Windows, and Git for
+# Windows otherwise checks text files out with CRLF (core.autocrlf=true), which
+# breaks the POSIX scripts and `.shellcheckrc` read by scripts/check.sh.
+* text=auto eol=lf
 
 # Shell scripts must stay LF even when checked out on Windows (bootstrap and
 # the rendered run_onchange_ scripts run under sh on Linux/macOS).

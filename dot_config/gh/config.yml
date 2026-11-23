@@ -1,0 +1,17 @@
+# Managed by chezmoi: dot_config/gh/config.yml.
+#
+# The PowerShell profile sets GH_CONFIG_DIR to %USERPROFILE%\.config\gh so the
+# same file is used on every platform (gh otherwise uses %APPDATA%\GitHub CLI
+# on Windows). Authentication lives in hosts.yml, which chezmoi does not manage.
+git_protocol: ssh
+prompt: enabled
+# Do not upload usage telemetry, matching DO_NOT_TRACK in both shells.
+telemetry: disabled
+editor:
+aliases:
+  co: pr checkout
+  pv: pr view
+  pc: pr create
+  pl: pr list
+  rv: repo view
+  rw: repo view --web

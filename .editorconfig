@@ -1,5 +1,11 @@
 root = true
 
+# Repository style, and the source for the managed ~/.editorconfig target:
+# dot_editorconfig.tmpl includes this file, so the same rules cover this repo
+# and machine-wide defaults. EditorConfig stops walking up at the first file
+# with `root = true`, so a project that ships its own .editorconfig still wins
+# completely.
+
 [*]
 charset = utf-8
 end_of_line = lf
@@ -9,6 +15,9 @@ indent_style = space
 indent_size = 4
 
 [*.{json,toml,yml,yaml,md}]
+indent_size = 2
+
+[*.{js,jsx,ts,tsx,html,css,scss}]
 indent_size = 2
 
 [*.lua]
@@ -36,3 +45,20 @@ indent_size = 4
 
 [*.fish.tmpl]
 indent_size = 4
+
+[*.{c,h,cc,cpp,hpp,cs,java,kt,kts,scala,rs,php,swift}]
+indent_size = 4
+
+[*.{py,pyi,ipynb}]
+indent_size = 4
+max_line_length = 100
+
+[*.go]
+indent_style = tab
+
+[Makefile]
+indent_style = tab
+
+[*.{md,markdown}]
+# Trailing spaces are meaningful in Markdown (hard line breaks).
+trim_trailing_whitespace = false

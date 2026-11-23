@@ -7,7 +7,6 @@ bootstrap.ps1
 bootstrap.ps1.tmpl
 LICENSE
 .gitignore
-.editorconfig
 .gitattributes
 .shellcheckrc
 .github/**

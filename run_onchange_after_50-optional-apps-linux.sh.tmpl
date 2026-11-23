@@ -8,7 +8,7 @@
 set -eu
 
 {{ include "scripts/lib/shell.sh" }}
-{{ include "scripts/lib/installers.sh" }}
+{{ include "scripts/lib/installers.sh" -}}
 
 PATH="$HOME/.deno/bin:$HOME/.local/bin:$PATH"
 export PATH

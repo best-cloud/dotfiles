@@ -20,6 +20,9 @@ end
 # TUNA mirror, the same one the apt and ELPA setup targets.
 set -gx HOMEBREW_API_DOMAIN https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api
 set -gx HOMEBREW_BOTTLE_DOMAIN https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles
+# No analytics upload and no "next steps" hint after every install.
+set -gx HOMEBREW_NO_ANALYTICS 1
+set -gx HOMEBREW_NO_ENV_HINTS 1
 {{ end -}}
 
 # ---------------------------------------------------------------------------
@@ -40,6 +43,19 @@ set -gx FNM_NODE_DIST_MIRROR https://mirrors.tuna.tsinghua.edu.cn/nodejs-release
 # TUNA no longer mirrors npm, so packages (prettier, aws-cdk) come from
 # npmmirror through npm's npm_config_registry setting.
 set -gx npm_config_registry https://registry.npmmirror.com/
+
+# ---------------------------------------------------------------------------
+# Shared configuration paths
+# ---------------------------------------------------------------------------
+# Keep one managed file per tool on all three operating systems. bat, gh and
+# lazygit otherwise switch to a platform-specific directory on Windows/macOS.
+set -gx BAT_CONFIG_PATH ~/.config/bat/config
+set -gx RIPGREP_CONFIG_PATH ~/.config/ripgrep/config
+set -gx GH_CONFIG_DIR ~/.config/gh
+set -gx LG_CONFIG_FILE ~/.config/lazygit/config.yml
+
+# Opt out of telemetry in tools that support the cross-industry convention.
+set -gx DO_NOT_TRACK 1
 
 # Put the default Node.js (and its npm) on PATH; --use-on-cd switches versions
 # automatically when a directory has a .node-version or .nvmrc file.
@@ -93,10 +109,27 @@ end
 {{ end -}}
 
 # ---------------------------------------------------------------------------
+# Small helpers
+# ---------------------------------------------------------------------------
+# Both shells expose the same helpers; keep them in sync with the PowerShell
+# profile (where `mkcd` and the git functions are defined too).
+function mkcd --description 'Create a directory and enter it'
+    if test (count $argv) -ne 1
+        echo 'usage: mkcd <directory>' >&2
+        return 1
+    end
+    mkdir -p -- $argv[1]; and cd -- $argv[1]
+end
+
+# ---------------------------------------------------------------------------
 # Interactive shell
 # ---------------------------------------------------------------------------
 if status is-interactive
     set -g fish_greeting
+
+    function reload --description 'Restart the interactive shell'
+        exec fish
+    end
 
     # Prompt
     if type -q starship
@@ -146,6 +179,11 @@ if status is-interactive
         abbr --add --global gl 'git log --oneline --graph --decorate --all'
         abbr --add --global gd 'git diff'
         abbr --add --global gco 'git checkout'
+        abbr --add --global gsw 'git switch'
+        abbr --add --global grb 'git rebase'
+        abbr --add --global gaa 'git add --all'
+        abbr --add --global gpush 'git push'
+        abbr --add --global gpull 'git pull'
     end
     if type -q lazygit
         abbr --add --global lg lazygit

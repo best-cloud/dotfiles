@@ -1,0 +1,33 @@
+# Managed by chezmoi: dot_ssh/config.tmpl -> ~/.ssh/config.
+#
+# Generic, host-independent SSH ergonomics. Machine- or employer-specific
+# hosts belong in ~/.ssh/config.d/*.conf, which is included first so a later
+# entry can override anything below. That directory is intentionally unmanaged
+# so private host names, jump hosts and keys stay out of the dotfiles repo.
+Include ~/.ssh/config.d/*.conf
+
+Host *
+    # Load a key into the agent on first use so a passphrase is typed once per
+    # agent lifetime. On Windows this needs the "OpenSSH Authentication Agent"
+    # service; without it ssh silently uses the key file directly.
+    AddKeysToAgent yes
+
+    # Keep idle sessions alive through NATs, VPNs and corporate proxies.
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+    TCPKeepAlive yes
+
+    HashKnownHosts yes
+
+{{ if ne .chezmoi.os "windows" -}}
+    # Reuse one TCP connection for every ssh/scp/rsync command to the same
+    # host. ControlPath uses %C (a hash of host, port, user and jump host), so
+    # long host names stay under the Unix socket path limit.
+    ControlMaster auto
+    ControlPath ~/.ssh/control-%C
+    ControlPersist 10m
+{{ end -}}
+
+# `ssh github.com` without a user name; clone URLs still use git@ explicitly.
+Host github.com
+    User git

@@ -7,7 +7,14 @@
 # Usage (fresh machine, one line):
 #   sh -c "$(curl -fsSL https://raw.githubusercontent.com/best-cloud/dotfiles/main/bootstrap.sh)"
 #
-# Set CHEZMOI_REPO to override the repository URL, or change REPO below.
+# Options:
+#   --repo URL   clone URL (default: https://github.com/best-cloud/dotfiles.git)
+#   --ref REF    branch or tag to apply when cloning (CHEZMOI_REF)
+#   -h, --help   show this help
+#
+# Environment:
+#   CHEZMOI_REPO override the repository URL
+#   CHEZMOI_REF  branch or tag to apply when cloning
 #
 # Generated from bootstrap.sh.tmpl by scripts/render-bootstrap.sh. Edit the
 # template or scripts/lib/*.sh instead of this file.
@@ -18,7 +25,63 @@ set -eu
 {{ include "scripts/lib/ubuntu-mirror.sh" }}
 {{ include "scripts/lib/wsl.sh" }}
 {{ include "scripts/lib/bootstrap.sh" }}
+REPO_FLAG=0
+if [ -n "${CHEZMOI_REPO:-}" ]; then
+    REPO_FLAG=1
+fi
 REPO="${CHEZMOI_REPO:-https://github.com/best-cloud/dotfiles.git}"
+REF="${CHEZMOI_REF:-}"
+
+usage() {
+    cat <<'EOF'
+Usage: bootstrap.sh [--repo URL] [--ref REF]
+
+  --repo URL   Git URL to clone (default: https://github.com/best-cloud/dotfiles.git)
+  --ref REF    Branch or tag to apply when cloning
+  -h, --help   Show this help
+
+Environment variables CHEZMOI_REPO and CHEZMOI_REF provide the same defaults.
+With a local checkout, the checkout itself is the source and --ref is ignored.
+EOF
+}
+
+die() {
+    echo "error: $*" >&2
+    exit 1
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+    -h | --help)
+        usage
+        exit 0
+        ;;
+    --repo)
+        [ "$#" -ge 2 ] || die "--repo requires a URL"
+        REPO=$2
+        REPO_FLAG=1
+        shift
+        ;;
+    --repo=*)
+        REPO=${1#*=}
+        REPO_FLAG=1
+        ;;
+    --ref)
+        [ "$#" -ge 2 ] || die "--ref requires a branch or tag"
+        REF=$2
+        shift
+        ;;
+    --ref=*)
+        REF=${1#*=}
+        ;;
+    *)
+        die "unknown option: $1 (try --help)"
+        ;;
+    esac
+    shift
+done
+
+[ -n "$REPO" ] || die "the repository URL cannot be empty"
 
 # Do not let a caller's CDPATH make `cd` print or pick another directory.
 unset CDPATH
@@ -28,9 +91,9 @@ if ! SCRIPT_DIR=$(cd -- "$script_dir" 2>/dev/null && pwd); then
     SCRIPT_DIR=$(pwd)
 fi
 
-# An explicit CHEZMOI_REPO wins; otherwise use the local checkout if there is
-# one, and finally fall back to the repository URL.
-if [ -z "${CHEZMOI_REPO:-}" ] && [ -f "$SCRIPT_DIR/.chezmoi.toml.tmpl" ]; then
+# An explicit --repo/CHEZMOI_REPO wins; otherwise use the local checkout if
+# there is one, and finally fall back to the repository URL.
+if [ "$REPO_FLAG" -eq 0 ] && [ -f "$SCRIPT_DIR/.chezmoi.toml.tmpl" ]; then
     SOURCE="$SCRIPT_DIR"
     LOCAL=1
 else
@@ -38,8 +101,16 @@ else
     LOCAL=0
 fi
 
-# Cache sudo credentials up front so the package script does not stop halfway.
-if [ "$(id -u)" -ne 0 ] && native_cmd sudo; then
+if [ "$LOCAL" -eq 1 ] && [ -n "$REF" ]; then
+    echo "warning: --ref applies to cloned sources; ignoring it for the local checkout at $SOURCE" >&2
+    REF=
+fi
+
+check_supported_os
+
+# Cache sudo credentials up front so the apt phase does not stop halfway. Only
+# do this on apt-based hosts: prompting for sudo on macOS is unnecessary.
+if native_cmd apt-get && [ "$(id -u)" -ne 0 ] && native_cmd sudo; then
     sudo -v || true
 fi
 
@@ -67,12 +138,18 @@ if ! native_cmd chezmoi; then
     exit 1
 fi
 
-echo "==> applying dotfiles from $SOURCE"
+echo "==> applying dotfiles from $SOURCE${REF:+ ($REF)}"
 if [ "$LOCAL" -eq 1 ]; then
     chezmoi init --apply --source "$SOURCE"
+elif [ -n "$REF" ]; then
+    chezmoi init --apply "$SOURCE" --branch "$REF"
 else
     chezmoi init --apply "$SOURCE"
 fi
 
 echo
-echo "==> done. Start a new shell to use fish, or run: exec fish"
+if running_in_wsl; then
+    echo "==> done. Run 'wsl --shutdown' from Windows, reopen Ubuntu, and start a new shell (or run: exec fish)."
+else
+    echo "==> done. Start a new shell to use fish, or run: exec fish"
+fi

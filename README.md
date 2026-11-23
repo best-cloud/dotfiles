@@ -5,6 +5,11 @@ chezmoi-managed dotfiles for **Ubuntu 26.04+** (including WSL2), **macOS** and
 
 Design principles:
 
+- **Developer experience first** — the shell, prompt, editor, terminal and
+  Git/SSH tooling are configured together so a fresh machine feels familiar
+  immediately: `fd`/`bat` under their upstream names, a Catppuccin theme
+  everywhere, `fzf` history search, SSH connection reuse, Git LFS and delta,
+  and one `chezmoi apply` to repair the whole setup.
 - **Package manager first** — apt on Ubuntu/WSL, Homebrew on macOS, winget on
   Windows. Upstream installers are only a fallback for tools a distro does not
   package.
@@ -58,6 +63,16 @@ first `chezmoi init` clones this repository with git. On first run you are
 prompted once for your name and email (used by Git) and whether to install the
 optional apps; those answers are stored in `~/.config/chezmoi/chezmoi.toml`.
 
+The Unix bootstrap also accepts `--repo URL` and `--ref REF` (or the
+`CHEZMOI_REPO` / `CHEZMOI_REF` environment variables), and the Windows
+bootstrap accepts `-Repo` and `-Ref`. Use `--ref` to install a branch or tag
+other than the default branch from a clone; when no repo override is given and
+a local checkout exists, the checkout itself is the source and `--ref` is
+ignored. `--help` prints the Unix usage.
+The bootstrap warns, but continues, when the host predates Ubuntu 26.04 or
+Windows 11. It also avoids prompting for sudo on macOS, where no apt phase
+exists.
+
 The generated config also records `sourceDir`. Without that, a bootstrap from a
 local checkout would leave later `chezmoi apply`/`chezmoi status` calls looking
 in the default source (`~/.local/share/chezmoi`), which does not exist.
@@ -90,17 +105,17 @@ GitHub (SSH key or `gh auth login`), or pass an SSH URL through
 | | Ubuntu / WSL2 (apt) | macOS (Homebrew) | Windows 11 (winget) |
 |---|---|---|---|
 | Shell / prompt | fish, starship | fish, starship | PowerShell 7, Starship |
-| Core CLI | git, curl, wget, build-essential, unzip, zip, bsdextrautils (col) | git, wget | Git |
+| Core CLI | git, git-lfs, curl, wget, build-essential, unzip, zip, bsdextrautils (col) | git, git-lfs, wget | Git, Git LFS |
 | Modern CLI | ripgrep, fd-find, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq |
 | Editors / multiplexers | neovim, emacs, zellij | neovim, emacs, zellij | Neovim, Emacs, Zellij |
-| Dev tools | gh, direnv, uv, AWS CLI, AWS CDK, lazygit, mosh | gh, direnv, uv, AWS CLI, AWS CDK, lazygit, mosh, WeChat DevTools, Postman | gh, uv, AWS CLI, AWS CDK, lazygit, WeChat DevTools, Postman (mosh via WSL) |
+| Dev tools | gh, direnv, uv, AWS CLI, AWS CDK, lazygit, delta, mosh | gh, direnv, uv, AWS CLI, AWS CDK, lazygit, delta, mosh, WeChat DevTools, Postman | gh, direnv, uv, AWS CLI, AWS CDK, lazygit, delta, WeChat DevTools, Postman (mosh via WSL) |
 | Containers | podman | podman | — |
 | Node.js | fnm (upstream installer) + Node.js LTS | fnm (Homebrew) + Node.js LTS | fnm (winget) + Node.js LTS |
 | AI / Python tooling | opencode, ruff, ollama | opencode, ruff, ollama | OpenCode, Ruff (ollama via WSL) |
 | Formatters / linters | prettier, shfmt, shellcheck | prettier, shfmt, shellcheck | Prettier, shfmt, ShellCheck |
 | Optional daily-use apps | see below (CLI tools) | see below | see below |
 | Terminal | — (client terminal) | Ghostty | Windows Terminal, WezTerm |
-| Remote access | openssh-server (Ubuntu Server 22, WSL 2222), mosh | mosh | Windows OpenSSH Server (22), firewall for 22 + WSL 2222/mosh |
+| Remote access | openssh-server (Ubuntu Server 22, WSL 2222), mosh, wslu (WSL only) | mosh | Windows OpenSSH Server (22), firewall for 22 + WSL 2222/mosh |
 | WSL2 / Ubuntu | — (native) | — | Microsoft.WSL + latest Ubuntu LTS |
 | Terminal font | — (client terminal) | JetBrainsMono Nerd Font | JetBrainsMono Nerd Font |
 | Editor config | Spacemacs in `~/.emacs.d` | Spacemacs in `~/.emacs.d` | Spacemacs in `%USERPROFILE%\.emacs.d` |
@@ -113,10 +128,35 @@ The Linux install script always checks apt first. If the release does not
 package a tool, it falls back to the upstream installer: `starship`, `uv` and
 `fnm` use their install scripts, zellij uses the GitHub release binary, `ruff`
 uses `uv tool install`, and prettier uses npm. Ollama and OpenCode are not
-packaged by apt at all, so they use their upstream installers. `eza` and
-`lazygit` are installed from apt when the release provides them; otherwise the
-script prints a warning and continues, and the shell config still works without
-them.
+packaged by apt at all, so they use their upstream installers. `eza`,
+`lazygit` and `git-delta` are installed from apt when the release provides
+them; otherwise the script prints a warning and continues, and the shell/Git
+config still works without them (`core.pager` falls back to `less`). apt
+installs are retried one package at a time when a batch fails, so one
+unavailable package does not block the rest of the list.
+
+`wslu` is a WSL-only package: it provides `wslview`, which fish exports as
+`BROWSER` so `gh auth login`, AWS SSO and `open`-style tools open links in the
+Windows browser instead of failing. Ubuntu Server does not need it, and macOS
+and Windows have their own URL handlers, so it is the one conditional package
+in the Linux list.
+
+`fd` and `bat` are installed from Ubuntu's `fd-find` and `bat` packages, whose
+binaries are named `fdfind` and `batcat`. The Linux script links them into
+`~/.local/bin` as `fd` and `bat` so the upstream names work in scripts, fzf,
+Emacs and non-fish shells; the fish wrappers remain as a fallback on older
+machines.
+
+`git-lfs` is in all three lists and its clean/smudge filters are written
+directly in `dot_gitconfig.tmpl` instead of by `git lfs install`. That keeps
+`chezmoi apply` from deleting the filters from the managed `.gitconfig`. The
+package scripts verify `git-lfs` and fail the run when it is missing, so LFS
+repositories never silently check out pointer files.
+
+`git-delta` is the Git pager and `interactive.diffFilter` on every platform,
+with the Catppuccin Mocha syntax theme. `core.pager` uses
+`delta || less -FRX`, so a machine where the delta install failed still has a
+working pager.
 
 `bsdextrautils` is a Linux-only dependency: it provides `col`, which the fish
 `MANPAGER` pipeline uses to strip overstrike codes before `bat` renders a man
@@ -159,8 +199,11 @@ start automatically, starts it, and creates a `Windows SSH (TCP 22)` inbound
 firewall rule on the `Any` profile. It also sets OpenSSH's `DefaultShell`
 registry value to PowerShell 7 (`pwsh.exe`), preferring the machine-wide MSI
 path and falling back to the discovered winget/MSIX package, so SSH sessions
-start in PowerShell 7 rather than `cmd.exe`. The capability install and service
-setup need an elevated PowerShell. Connect to the Windows host with:
+start in PowerShell 7 rather than `cmd.exe`. It sets the built-in
+`OpenSSH Authentication Agent` service to Automatic and starts it, so
+`AddKeysToAgent yes` from `~/.ssh/config` needs a passphrase only once. The
+capability install and service setup need an elevated PowerShell. Connect to
+the Windows host with:
 
 ```sh
 ssh <windows-user>@<windows-lan-ip>
@@ -350,13 +393,74 @@ The package managers that apt does not drive use mirrors too:
   override it per command with `--registry=https://registry.npmjs.org/`.
 - **Node.js** — covered in [Node.js, prettier and linters](#nodejs-prettier-and-linters).
 
+## Git, SSH and shared developer configs
+
+`dot_gitconfig.tmpl` is the single Git config on every platform. Besides the
+usual rebase/prune/auto-setup-remote defaults it configures:
+
+- `delta` as the pager and `interactive.diffFilter`, with a `less` fallback and
+  the Catppuccin Mocha syntax theme;
+- the LFS clean/smudge/process filters directly, so `git lfs` works in every
+  clone without running `git lfs install` (which would be undone by the next
+  `chezmoi apply`);
+- `core.autocrlf=false` on Unix and `input` on Windows, plus `longpaths=true` on
+  Windows, so cross-platform checkouts stay LF;
+- `diff.algorithm=histogram`, `colorMoved=zebra`, `merge.conflictstyle=zdiff3`,
+  `rerere`, `rebase.autoStash`, `column.ui=auto`, and short aliases such as
+  `git undo`, `git wip`, `git root` and `git uncommit`.
+
+`dot_gitignore_global` and `dot_config/git/attributes` are wired through
+`core.excludesFile` and `core.attributesFile`. The ignore list covers the usual
+OS/editor/Python/Node/infra artifacts (including `cdk.out/` and
+`.terraform/`); the attributes file keeps working trees LF and marks common
+binary formats.
+
+`dot_ssh/config.tmpl` applies a small, host-independent client policy:
+
+- `AddKeysToAgent yes`, keepalives for NAT/VPN sessions, and hashed known hosts;
+- connection reuse (`ControlMaster auto`, `ControlPath ~/.ssh/control-%C`,
+  `ControlPersist 10m`) on Unix, where OpenSSH supports it;
+- `Host github.com` with `User git`, so `ssh github.com` works without a URL.
+
+Machine-specific hosts, jump hosts and keys belong in `~/.ssh/config.d/*.conf`,
+which is included first and is deliberately unmanaged.
+
+### bat, ripgrep, gh and lazygit
+
+These tools otherwise look in a platform-specific directory. The managed fish
+and PowerShell environments set one path for all three operating systems, so
+each tool has a single config file:
+
+| Tool | Environment variable | Managed file |
+|---|---|---|
+| bat | `BAT_CONFIG_PATH` | `dot_config/bat/config` (Catppuccin Mocha, line numbers) |
+| ripgrep | `RIPGREP_CONFIG_PATH` | `dot_config/ripgrep/config` (smart case, hidden, build-dir ignores) |
+| GitHub CLI | `GH_CONFIG_DIR` | `dot_config/gh/config.yml` (SSH protocol, `gh pc/pv/co` aliases) |
+| lazygit | `LG_CONFIG_FILE` | `dot_config/lazygit/config.yml` (Catppuccin theme, Nerd Font v3) |
+
+Authentication stays out of the repo: `gh auth login` writes
+`~/.config/gh/hosts.yml`, which chezmoi does not manage.
+
+### Editor and login polish
+
+`.editorconfig` is the repository style and the source for
+`dot_editorconfig.tmpl`, which is managed as `~/.editorconfig`. Because the
+target keeps `root = true`, it applies only when a project does not ship its own
+file. It sets UTF-8, LF, a final newline, trimmed trailing whitespace, 4-space
+defaults, 2-space JS/TS/JSON/YAML/Lua, tabs for Go and Makefiles, Python 4/100,
+and keeps Markdown trailing spaces.
+
+`empty_dot_hushlogin` creates an empty `~/.hushlogin`, which suppresses the
+"Last login" banner on macOS and Ubuntu. The shell greeting is already empty.
+
 ## Repository layout
 
 ```text
 .
 ├── .chezmoi.toml.tmpl                  # machine data + prompts (sourceDir, name, email, optional apps, OS flags)
 ├── .chezmoiignore                      # OS-specific and repo-only targets
-├── .editorconfig                       # whitespace/indentation rules
+├── .editorconfig                       # repo style; included by dot_editorconfig.tmpl
+├── dot_editorconfig.tmpl               # managed ~/.editorconfig
 ├── .gitattributes                      # line-ending rules
 ├── .shellcheckrc                       # shellcheck target shell
 ├── bootstrap.sh.tmpl / bootstrap.ps1.tmpl   # one-command entry point sources
@@ -365,15 +469,24 @@ The package managers that apt does not drive use mirrors too:
 │   ├── check.sh                             # render + lint everything locally or in CI
 │   ├── render-bootstrap.sh                  # regenerate bootstrap.sh/bootstrap.ps1
 │   └── lib/                                 # shared shell/PowerShell fragments
-├── .github/workflows/ci.yml            # Linux + macOS check job
-├── dot_gitconfig.tmpl                  # single Git config for all OSes
-├── dot_gitignore_global
+├── .github/
+│   ├── dependabot.yml                  # keep Actions current
+│   └── workflows/ci.yml                # Linux + macOS + Windows check job
+├── dot_gitconfig.tmpl                  # single Git config for all OSes (delta, LFS, aliases)
+├── dot_gitignore_global                # global excludes
+├── empty_dot_hushlogin                 # empty ~/.hushlogin (suppresses the banner)
+├── dot_ssh/config.tmpl                 # SSH keepalive, agent, multiplexing
 ├── dot_wslconfig                       # Windows-only mirrored WSL networking
 ├── dot_spacemacs                       # default Spacemacs develop dotfile + TUNA ELPA
 ├── dot_config/
+│   ├── bat/config                      # shared bat config (BAT_CONFIG_PATH)
+│   ├── gh/config.yml                   # shared gh config (GH_CONFIG_DIR)
+│   ├── git/attributes                  # global Git attributes
+│   ├── lazygit/config.yml              # shared lazygit config (LG_CONFIG_FILE)
+│   ├── ripgrep/config                  # shared rg config (RIPGREP_CONFIG_PATH)
 │   ├── fish/config.fish.tmpl           # single fish config for Ubuntu + macOS
 │   ├── starship.toml                   # catppuccin-powerline preset + uv python_binary
-│   ├── zellij/config.kdl               # shared; Windows uses ZELLIJ_CONFIG_DIR
+│   ├── zellij/config.kdl.tmpl          # shared; Windows uses ZELLIJ_CONFIG_DIR
 │   ├── nvim/init.lua                   # plugin-free, works offline
 │   ├── yt-dlp/config                   # optional yt-dlp/Deno/archive settings
 │   ├── uv/uv.toml                      # TUNA PyPI index for uv (Unix)
@@ -412,9 +525,11 @@ idempotent).
 
 Individual downloads stay best-effort so one failure does not block the rest of
 the list. The tools with no distro package (Node.js from fnm, prettier, AWS CDK)
-are verified at the end of the package script, though: when one is still missing
-the script exits non-zero, `chezmoi apply` reports the error, and chezmoi re-runs
-the script on the next apply instead of recording a partial install as done.
+and `git-lfs` are verified at the end of the package script, though: when one
+is still missing the script exits non-zero, `chezmoi apply` reports the error,
+and chezmoi re-runs the script on the next apply instead of recording a partial
+install as done. A failed apt or Homebrew batch is retried one package at a
+time, so a single unavailable package does not hide the rest.
 
 The scripts are templates too. On the wrong OS a script renders to whitespace,
 and chezmoi skips whitespace-only scripts entirely. That is why a `.ps1`
@@ -446,15 +561,22 @@ scratch chezmoi config, then validates the output:
 - `fish -n` for the fish config;
 - the PowerShell parser for `.ps1` files, including the Windows branches of
   `.ps1.tmpl` files (the Go template wrapper is stripped and includes expanded);
-- JSON, TOML and Lua parsing for the configs, and `git config` for the rendered
-  Git config;
+- JSON, TOML, YAML and Lua parsing for the configs, `git config` for the
+  rendered Git config, `ssh -G -F` for the SSH config, and Emacs `check-parens`
+  for `dot_spacemacs`;
 - a sync check that fails when `bootstrap.sh` or `bootstrap.ps1` differs from
-  its rendered template.
+  its rendered template;
+- a line-ending check that fails when the Git index or working tree contains
+  CRLF (the repository is LF-only; this is what broke `.shellcheckrc` on a
+  Windows checkout).
 
 Missing optional tools are skipped, so the script is useful on a fresh machine.
-`.github/workflows/ci.yml` runs it on Linux and macOS with the tools installed,
-and runs `actionlint` on the workflow itself on Linux. Run the checks before
-committing a change:
+It looks for `python3` and then `python`, and ignores the broken Microsoft Store
+execution aliases; on Windows without a real Python, the JSON check falls back
+to `ConvertFrom-Json`. `.github/workflows/ci.yml` runs the checks on Linux,
+macOS and Windows (Git Bash) with the tools installed, and runs `actionlint` on
+the workflow itself on Linux. Dependabot keeps the Actions current. Run the
+checks before committing a change:
 
 ```sh
 sh scripts/check.sh
@@ -499,17 +621,25 @@ genuinely differ.
 
 - adds `~/.local/bin`, `~/.cargo/bin`, `~/.opencode/bin` and `~/.deno/bin`,
   plus `~/.local/share/fnm` on Linux, to `PATH`;
-- loads Homebrew's `shellenv` on macOS only;
+- loads Homebrew's `shellenv` on macOS only, disables Homebrew analytics and
+  env hints, and points Homebrew at the TUNA API/bottle mirrors;
 - initializes fnm (`fnm env --use-on-cd`) when it is installed;
-- defines `fd`/`bat` wrappers for Ubuntu's `fdfind`/`batcat` names;
+- exports `BAT_CONFIG_PATH`, `RIPGREP_CONFIG_PATH`, `GH_CONFIG_DIR`,
+  `LG_CONFIG_FILE` and `DO_NOT_TRACK`;
+- defines `fd`/`bat` wrappers for Ubuntu's `fdfind`/`batcat` names as a
+  fallback for machines that predate the `~/.local/bin` links;
+- defines `mkcd` and `reload`;
 - initializes Starship, zoxide, fzf and direnv;
 - adds guarded abbreviations (`ls` → `eza`, `cat` → `bat`, `vi` → `nvim`,
-  `e` → `emacs -nw`, `zj` → zellij, `o` → opencode, …);
+  `e` → `emacs -nw`, `zj` → zellij, `o` → opencode, `gco`/`gsw`/`grb`/`gaa`/
+  `gpush`/`gpull` for Git, …);
 - sources `~/.config/fish/local.fish` if it exists for machine-local tweaks.
 
 The PowerShell 7 profile defines the same aliases and abbreviations as the fish
-config, so the two shells stay consistent across platforms. The 5.1 shim
-inherits everything by dot-sourcing that profile.
+config, so the two shells stay consistent across platforms. It also exports the
+same shared config paths, hooks direnv, and maps Ctrl+R/Ctrl+T to fzf history
+and file pickers when fzf is installed. The 5.1 shim inherits everything by
+dot-sourcing that profile.
 
 `run_onchange_after_20-default-shell.sh.tmpl` adds the fish path to
 `/etc/shells` when needed and runs `chsh`. Log out and back in (or run
@@ -551,10 +681,10 @@ is applied to the packaged Windows Terminal settings file. It:
 - adds an Ubuntu profile that runs `wsl.exe -d Ubuntu --cd ~`, and disables the
   generated WSL/Azure/Visual Studio profile sources so the profile list stays
   deterministic;
-- matches the managed WezTerm font and sizing: Catppuccin Mocha, JetBrainsMono
-  Nerd Font medium at 12 pt, 1.1 cell height, 92% acrylic opacity, a hidden tab
-  row when only one tab is open, 100k-line scrollback and a 160x44 initial
-  window;
+- matches the managed WezTerm font and palette: Catppuccin Mocha, JetBrainsMono
+  Nerd Font medium at 12 pt, a deliberately taller 1.5 cell height, 92% acrylic
+  opacity, a hidden tab row when only one tab is open, 100k-line scrollback and
+  a 160x44 initial window;
 - embeds the `Catppuccin Mocha` color scheme and terminal theme copied verbatim
   from <https://github.com/catppuccin/windows-terminal> (`mocha.json` and
   `mochaTheme.json`).
@@ -629,6 +759,12 @@ when that matters.
   Neovim, Starship, Zellij and WezTerm use the same managed config files as
   Linux/macOS instead of duplicating them in `%LOCALAPPDATA%`. Zellij ignores
   `XDG_CONFIG_HOME` on Windows, so the profile also sets `ZELLIJ_CONFIG_DIR`.
+- The profile also points `BAT_CONFIG_PATH`, `RIPGREP_CONFIG_PATH`,
+  `GH_CONFIG_DIR` and `LG_CONFIG_FILE` at the shared `~/.config` files, exports
+  `DO_NOT_TRACK` and `POWERSHELL_TELEMETRY_OPTOUT`, hooks direnv when it is
+  installed, and maps Ctrl+R/Ctrl+T to fzf history/file pickers. It forces UTF-8
+  for redirected output and native-command pipelines so PowerShell 5.1 does not
+  write UTF-16 files.
 - The profile sets `SHELL` to `pwsh` under PowerShell 7 and to `powershell`
   under Windows PowerShell 5.1, so Zellij panes start in PowerShell instead of
   falling back to `cmd.exe`. The 5.1 shim dot-sources the PS7 profile, and the
@@ -641,7 +777,10 @@ when that matters.
 - Windows Terminal is the default Windows client and opens PowerShell 7; its
   managed settings live under
   `%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState`.
-  WezTerm stays installed for WSL-only sessions and opens WSL2 directly.
+  It copies on select, strips formatting, trims pasted whitespace, uses compact
+  tabs and a 1.5 cell height (manually tuned; WezTerm keeps its own 1.1 line
+  height). WezTerm stays installed for WSL-only sessions and opens WSL2
+  directly.
 - `run_onchange_after_35-windows-ssh.ps1.tmpl` enables the built-in Windows
   OpenSSH Server on port 22: it installs the `OpenSSH.Server` capability, sets
   the `sshd` service to Automatic and starts it, adds a `Windows SSH (TCP 22)`
@@ -654,11 +793,14 @@ when that matters.
   shell and sometimes a reboot; the script prints the exact command and exits
   cleanly when it is not elevated. Launch Ubuntu once after it is registered to
   create the Linux user.
-- The managed `~/.wslconfig` sets `networkingMode=mirrored`, and the same
-  script creates the Windows Firewall and Hyper-V firewall rules for SSH on TCP
-  2222 and mosh on UDP 60000-61000. Run `wsl --shutdown` after the first apply
-  so WSL picks up the new networking mode; create the rules from an elevated
-  shell.
+- The managed `~/.wslconfig` keeps `networkingMode=mirrored` and adds
+  `autoMemoryReclaim=gradual` (return idle RAM to Windows), `sparseVhd=true`,
+  `firewall=true` and `hostAddressLoopback=true`. DNS tunneling and automatic
+  proxy forwarding are deliberately omitted because this machine's VPN lives on
+  the router, not on Windows. The same script creates the Windows Firewall and
+  Hyper-V firewall rules for SSH on TCP 2222 and mosh on UDP 60000-61000. Run
+  `wsl --shutdown` after the first apply so WSL picks up the new settings;
+  create the rules from an elevated shell.
 - Run `bootstrap.sh` inside the WSL distro as well; the two sides are
   independent chezmoi installations.
 
@@ -776,6 +918,18 @@ Windows PowerShell 5.1 does not support `<` redirection, so use
 `Get-Content -Raw dot_config/fish/config.fish.tmpl | chezmoi execute-template --source .`.
 `sh scripts/check.sh` renders and checks every template in one step.
 
+To render the other operating systems' branches from one machine, override the
+template data that the scripts read:
+
+```sh
+chezmoi execute-template \
+  --override-data '{"chezmoi":{"os":"linux"},"isWSL":true,"isMacOS":false,"isWindows":false}' \
+  --source . < run_onchange_before_10-install-packages.sh.tmpl | sh -n
+```
+
+Use `"os":"darwin"` with `isMacOS` or `"os":"windows"` with `isWindows` for the
+other branches. CI does this by running the checks on all three runners.
+
 Check what chezmoi manages and would change:
 
 ```sh
@@ -803,6 +957,11 @@ chezmoi verify
   updates.
 - **Homebrew is missing on a fresh Mac** — the macOS script installs it
   automatically; you may be prompted to install the Xcode Command Line Tools.
+- **`scripts/check.sh` reports CRLF line endings** — the repository is LF-only.
+  Commit or stash local edits, then normalize the checkout:
+  `git add --renormalize . && git checkout -- .`. `core.autocrlf=true` alone is
+  not enough: `.gitattributes` sets `eol=lf` for every text file, which is what
+  keeps the POSIX scripts and `.shellcheckrc` working on Windows.
 - **Nothing re-runs after editing a script** — only rendered content changes
   trigger `run_onchange_`. Delete the script's `entryState` key as shown above
   to force a run.
@@ -825,6 +984,28 @@ chezmoi verify
   apps install Deno, and `~/.config/yt-dlp/config` sets `--js-runtimes deno`.
   Check `deno --version`; on Linux the official installer puts it in
   `~/.deno/bin`, which fish adds to `PATH`.
+- **Git output is plain or `git diff` errors about `delta`** — the managed
+  `core.pager` is `delta || less -FRX`, so a missing delta falls back to less.
+  Install it (`sudo apt-get install git-delta`, `brew install git-delta` or
+  `winget install dandavison.delta`) and re-run `chezmoi apply`. If delta runs
+  but the Catppuccin theme is unknown, upgrade delta; the config still works
+  with delta's bundled default theme.
+- **LFS repositories check out pointer files** — `git lfs version` must succeed.
+  The filters are already in `~/.gitconfig`; do not run `git lfs install`
+  (chezmoi would restore the managed file and remove its edits). On Windows the
+  installer writes `C:\Program Files\Git LFS`, which is added to the persisted
+  `PATH`; open a new shell if `git lfs` is not found there yet.
+- **`ssh` complains about a `ControlPath` socket** — stale multiplexing sockets
+  are safe to remove: `rm -f ~/.ssh/control-*`. Multiplexing is only enabled on
+  Unix; Windows OpenSSH does not support it.
+- **`bat` says the Catppuccin theme is unknown** — the theme ships with bat
+  0.24+. Ubuntu 26.04, Homebrew and the winget package are new enough; if an
+  older binary is first on `PATH`, upgrade it or remove the `--theme` line from
+  `~/.config/bat/config`.
+- **`gh`, `lazygit` or `rg` ignores the managed config** — they read
+  `GH_CONFIG_DIR`, `LG_CONFIG_FILE` and `RIPGREP_CONFIG_PATH`, which fish and
+  the PowerShell profile export. Start a new shell after applying, and check
+  `echo $env:GH_CONFIG_DIR` (PowerShell) or `echo $GH_CONFIG_DIR` (fish).
 - **A command resolves to `/mnt/c/...`** — WSL appends the Windows `PATH`, so
   `prettier`, `zellij`, `emacs` and similar tools can fall through to a Windows
   shim when no native binary exists. The install scripts ignore `/mnt` and

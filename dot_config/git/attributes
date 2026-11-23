@@ -1,0 +1,36 @@
+# Managed by chezmoi: dot_config/git/attributes.
+#
+# Global Git attributes, applied through core.attributesFile. Repository-local
+# .gitattributes files take precedence, so this only fills the gaps.
+
+# Keep working-tree text LF on every platform (core.autocrlf handles the rest).
+* text=auto eol=lf
+
+# Windows tooling still expects CRLF in these formats.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.sln text eol=crlf
+
+# Common binary formats: never attempt text conversion or diffing.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tgz binary
+*.7z binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+
+# Lock files are generated; mark them so GitHub collapses them in reviews.
+*.lock linguist-generated

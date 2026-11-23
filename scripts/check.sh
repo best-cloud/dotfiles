@@ -14,7 +14,17 @@ if ! ROOT=$(cd -- "$script_dir/.." 2>/dev/null && pwd); then
 fi
 
 need() { command -v "$1" >/dev/null 2>&1; }
-have_tomllib() { python3 -c 'import tomllib' >/dev/null 2>&1; }
+# Windows CI and Git Bash usually provide `python`, not `python3`. The
+# Microsoft Store execution aliases exist without a real interpreter, so probe
+# the candidate before trusting it.
+PYTHON=
+for candidate in python3 python; do
+    if need "$candidate" && "$candidate" -c 'pass' >/dev/null 2>&1; then
+        PYTHON=$candidate
+        break
+    fi
+done
+have_tomllib() { [ -n "$PYTHON" ] && "$PYTHON" -c 'import tomllib' >/dev/null 2>&1; }
 fail() {
     echo "check failed: $*" >&2
     exit 1
@@ -23,6 +33,14 @@ fail() {
 need chezmoi || fail "chezmoi is required"
 need sh || fail "sh is required"
 
+# The whole repository is LF in the index and working tree; CRLF breaks the
+# POSIX scripts and .shellcheckrc on Windows checkouts.
+if need git && git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+    if git -C "$ROOT" ls-files --eol | grep -E 'i/crlf|w/crlf' >/dev/null; then
+        fail "CRLF line endings found; .gitattributes requires LF (re-checkout or run: git add --renormalize . && git checkout -- .)"
+    fi
+fi
+
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
@@ -30,8 +48,8 @@ mkdir -p "$tmp/home"
 chezmoi init --apply=false --promptDefaults \
     --source "$ROOT" --destination "$tmp/home" --config "$tmp/chezmoi.toml" >/dev/null
 
-if need python3 && have_tomllib; then
-    python3 -c 'import sys, tomllib; tomllib.load(open(sys.argv[1], "rb"))' "$tmp/chezmoi.toml" ||
+if have_tomllib; then
+    "$PYTHON" -c 'import sys, tomllib; tomllib.load(open(sys.argv[1], "rb"))' "$tmp/chezmoi.toml" ||
         fail "TOML: $tmp/chezmoi.toml"
 fi
 
@@ -112,8 +130,14 @@ check_ps1() {
 }
 
 check_json() {
-    if need python3; then
-        python3 -m json.tool "$1" >/dev/null || fail "JSON: $1"
+    if [ -n "$PYTHON" ]; then
+        "$PYTHON" -m json.tool "$1" >/dev/null || fail "JSON: $1"
+    elif need pwsh; then
+        # Local Git-for-Windows checkout without a real Python interpreter.
+        # shellcheck disable=SC2016  # single quotes keep the PowerShell $variables intact
+        CHECK_FILE=$1 pwsh -NoLogo -NoProfile -NonInteractive -Command \
+            'Get-Content -Raw -LiteralPath $env:CHECK_FILE | ConvertFrom-Json > $null' ||
+            fail "JSON: $1"
     fi
 }
 
@@ -126,9 +150,35 @@ check_lua() {
 }
 
 check_toml() {
-    if need python3 && have_tomllib; then
-        python3 -c 'import sys, tomllib; tomllib.load(open(sys.argv[1], "rb"))' "$1" ||
+    if have_tomllib; then
+        "$PYTHON" -c 'import sys, tomllib; tomllib.load(open(sys.argv[1], "rb"))' "$1" ||
             fail "TOML: $1"
+    fi
+}
+
+check_yaml() {
+    [ -s "$1" ] || return 0
+    if [ -n "$PYTHON" ] && "$PYTHON" -c 'import yaml' >/dev/null 2>&1; then
+        "$PYTHON" -c 'import sys, yaml; yaml.safe_load(open(sys.argv[1], encoding="utf-8"))' "$1" ||
+            fail "YAML: $1"
+    fi
+}
+
+check_ssh() {
+    [ -s "$1" ] || return 0
+    if need ssh; then
+        # -G parses the config and prints the effective settings without
+        # connecting; a malformed Host/Include block exits non-zero.
+        ssh -G -F "$1" example.com >/dev/null 2>&1 || fail "ssh config: $1"
+    fi
+}
+
+check_elisp() {
+    [ -s "$1" ] || return 0
+    if need emacs; then
+        CHECK_ELISP=$1 emacs -Q --batch \
+            --eval '(with-temp-buffer (insert-file-contents (getenv "CHECK_ELISP")) (emacs-lisp-mode) (check-parens))' \
+            >/dev/null 2>&1 || fail "Emacs Lisp: $1"
     fi
 }
 
@@ -139,8 +189,11 @@ for file in "$render_dir"/*; do
     *.ps1) check_ps1 "$file" ;;
     *.json) check_json "$file" ;;
     *.lua) check_lua "$file" ;;
+    *.yml | *.yaml) check_yaml "$file" ;;
     esac
 done
+
+check_ssh "$render_dir/dot_ssh__config"
 
 # Non-template files that are checked in directly.
 check_sh "$ROOT/bootstrap.sh"
@@ -163,6 +216,9 @@ check_lua "$ROOT/dot_config/wezterm/wezterm.lua"
 check_toml "$ROOT/dot_config/starship.toml"
 check_toml "$ROOT/dot_config/uv/uv.toml"
 check_toml "$ROOT/AppData/Roaming/uv/uv.toml"
+check_yaml "$ROOT/dot_config/gh/config.yml"
+check_yaml "$ROOT/dot_config/lazygit/config.yml"
+check_elisp "$ROOT/dot_spacemacs"
 
 # The rendered Git config is valid when git can parse it.
 if need git; then

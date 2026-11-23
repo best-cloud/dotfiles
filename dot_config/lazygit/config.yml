@@ -1,0 +1,38 @@
+# Managed by chezmoi: dot_config/lazygit/config.yml.
+#
+# LG_CONFIG_FILE points here from fish and the PowerShell profile, because
+# lazygit otherwise looks under ~/Library/Application Support on macOS and
+# %APPDATA% on Windows.
+gui:
+  nerdFontsVersion: "3"
+  # Catppuccin Mocha, matching the managed terminals and bat.
+  theme:
+    activeBorderColor:
+      - "#89b4fa"
+      - bold
+    inactiveBorderColor:
+      - "#6c7086"
+    optionsTextColor:
+      - "#89b4fa"
+    selectedLineBgColor:
+      - "#313244"
+    cherryPickedCommitBgColor:
+      - "#45475a"
+    cherryPickedCommitFgColor:
+      - "#89b4fa"
+    unstagedChangesColor:
+      - "#f38ba8"
+    defaultFgColor:
+      - "#cdd6f4"
+    searchingActiveBorderColor:
+      - "#f9e2af"
+  # Keep the side panel wide enough for long branch names.
+  sidePanelWidth: 0.3
+# Do not ask twice when quitting.
+confirmOnQuit: false
+git:
+  # Show the full commit message in the commits panel.
+  log:
+    order: topo-order
+    showGraph: always
+    showWholeGraph: false

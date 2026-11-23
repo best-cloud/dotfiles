@@ -1,7 +1,0 @@
-// Zellij configuration. Kept intentionally small so zellij upgrades do not
-// break it. Run `zellij setup --dump-config` to see every available option.
-
-simplified_ui true
-show_startup_tips false
-show_release_notes false
-theme "default"

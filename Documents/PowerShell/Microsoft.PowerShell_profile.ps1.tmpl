@@ -28,6 +28,13 @@ if (Test-Path $denoBin) {
     Add-PathEntry $denoBin
 }
 
+# Git LFS installs here and updates the persisted PATH; add it explicitly so a
+# shell opened before the next sign-in can still run `git lfs`.
+$gitLfsBin = Join-Path $env:ProgramFiles 'Git LFS'
+if (Test-Path $gitLfsBin) {
+    Add-PathEntry $gitLfsBin
+}
+
 # Node.js is managed by fnm on every platform. `--use-on-cd` switches versions
 # automatically in directories with a .node-version or .nvmrc file. fnm
 # downloads from nodejs.org by default; use the TUNA mirror, the same one the
@@ -67,6 +74,17 @@ $env:XDG_CACHE_HOME = Join-Path $HOME '.cache'
 $env:EDITOR = 'nvim'
 $env:VISUAL = 'nvim'
 
+# Keep one managed config file per tool on all three operating systems. bat,
+# gh and lazygit otherwise read a platform-specific directory on Windows.
+$env:BAT_CONFIG_PATH = Join-Path $HOME '.config\bat\config'
+$env:RIPGREP_CONFIG_PATH = Join-Path $HOME '.config\ripgrep\config'
+$env:GH_CONFIG_DIR = Join-Path $HOME '.config\gh'
+$env:LG_CONFIG_FILE = Join-Path $HOME '.config\lazygit\config.yml'
+
+# Cross-industry telemetry opt-out plus the PowerShell-specific switch.
+$env:DO_NOT_TRACK = '1'
+$env:POWERSHELL_TELEMETRY_OPTOUT = '1'
+
 # Emacs on Windows uses HOME to locate ~/.emacs.d. Keep it aligned with the
 # PowerShell home so terminal and GUI Emacs see the same Spacemacs checkout.
 if (-not $env:HOME) {
@@ -85,6 +103,28 @@ if ($PSVersionTable.PSVersion.Major -ge 6) {
     $env:SHELL = 'powershell'
 }
 
+# PowerShell 5.1 defaults to UTF-16 for redirected output, and native-command
+# pipelines use the console code page. Force UTF-8 so files and pipes are
+# readable by every other tool in this repository.
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$outputEncodingName = if ($PSVersionTable.PSVersion.Major -ge 6) { 'utf8NoBOM' } else { 'utf8' }
+$PSDefaultParameterValues['Out-File:Encoding'] = $outputEncodingName
+$PSDefaultParameterValues['Set-Content:Encoding'] = $outputEncodingName
+$PSDefaultParameterValues['Add-Content:Encoding'] = $outputEncodingName
+
+# ---------------------------------------------------------------------------
+# Small helpers, kept in sync with dot_config/fish/config.fish.tmpl
+# ---------------------------------------------------------------------------
+function mkcd {
+    param([Parameter(Mandatory)][string]$Path)
+    New-Item -ItemType Directory -Path $Path -Force | Out-Null
+    Set-Location -Path $Path
+}
+
+function reload {
+    . $PROFILE
+}
+
 # ---------------------------------------------------------------------------
 # Prompt
 # ---------------------------------------------------------------------------
@@ -100,6 +140,13 @@ if (Get-Command zoxide -ErrorAction SilentlyContinue) {
 }
 
 # ---------------------------------------------------------------------------
+# direnv: load .envrc files automatically
+# ---------------------------------------------------------------------------
+if (Get-Command direnv -ErrorAction SilentlyContinue) {
+    Invoke-Expression (& { (direnv hook pwsh | Out-String) })
+}
+
+# ---------------------------------------------------------------------------
 # PSReadLine
 # ---------------------------------------------------------------------------
 if (Get-Module -ListAvailable PSReadLine) {
@@ -109,8 +156,43 @@ if (Get-Module -ListAvailable PSReadLine) {
         Set-PSReadLineOption -PredictionViewStyle ListView
         Set-PSReadLineOption -EditMode Windows
         Set-PSReadLineOption -BellStyle None
+        Set-PSReadLineOption -HistoryNoDuplicates
+        Set-PSReadLineOption -MaximumHistoryCount 32767
+        Set-PSReadLineOption -HistorySearchCursorMovesToEnd
+        # Up/Down search history by the prefix already typed instead of
+        # stepping through every entry.
+        Set-PSReadLineKeyHandler -Key UpArrow -Function HistorySearchBackward
+        Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward
     } catch {
         # Older PSReadLine versions do not support every option above.
+    }
+
+    # Fuzzy history and file pickers. fzf is installed by the package scripts;
+    # the built-in Ctrl+R is kept as the fallback when it is missing.
+    if (Get-Command fzf -ErrorAction SilentlyContinue) {
+        Set-PSReadLineKeyHandler -Chord 'Ctrl+r' -ScriptBlock {
+            $historyPath = (Get-PSReadLineOption).HistorySavePath
+            $lines = Get-Content -LiteralPath $historyPath -ErrorAction SilentlyContinue |
+                Select-Object -Unique
+            if (-not $lines) { return }
+            $selection = $lines | fzf --height 40% --layout=reverse --border --tac
+            if ($selection) {
+                [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()
+                [Microsoft.PowerShell.PSConsoleReadLine]::Insert($selection)
+            }
+        }
+        Set-PSReadLineKeyHandler -Chord 'Ctrl+t' -ScriptBlock {
+            if (Get-Command fd -ErrorAction SilentlyContinue) {
+                $items = fd --type f --hidden --exclude .git
+            } else {
+                $items = Get-ChildItem -Recurse -File -ErrorAction SilentlyContinue |
+                    ForEach-Object { $_.FullName }
+            }
+            $selection = $items | fzf --height 40% --layout=reverse --border
+            if ($selection) {
+                [Microsoft.PowerShell.PSConsoleReadLine]::Insert($selection)
+            }
+        }
     }
 }
 
@@ -137,6 +219,11 @@ if (Get-Command git -ErrorAction SilentlyContinue) {
     function gl { git log --oneline --graph --decorate --all @args }
     function gd { git diff @args }
     function gco { git checkout @args }
+    function gsw { git switch @args }
+    function grb { git rebase @args }
+    function gaa { git add --all @args }
+    function gpush { git push @args }
+    function gpull { git pull @args }
 }
 if (Get-Command lazygit -ErrorAction SilentlyContinue) {
     Set-Alias -Name lg -Value lazygit -Force

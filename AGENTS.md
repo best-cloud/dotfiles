@@ -3,8 +3,8 @@
 chezmoi dotfiles for Ubuntu 26.04+/WSL2, macOS and Windows 11 26H2+. Correctness
 means templates render, the static checks pass and chezmoi is in sync. `scripts/check.sh`
 renders the templates and runs the available linters; `.github/workflows/ci.yml`
-runs it on Linux and macOS. README.md documents the design and per-OS behavior;
-this file only records what agents otherwise get wrong.
+runs it on Linux, macOS and Windows. README.md documents the design and per-OS
+behavior; this file only records what agents otherwise get wrong.
 
 ## Verify before claiming a change works
 
@@ -28,8 +28,11 @@ this file only records what agents otherwise get wrong.
   `--destination` and `--config` commands in README "Testing changes safely".
 - Run `sh scripts/check.sh` after editing scripts or templates. It renders every
   template into a temporary tree, then runs `sh -n`, `shellcheck`, `shfmt`,
-  `fish -n`, the PowerShell parser, JSON/TOML/Lua checks and `actionlint` when
-  those tools are installed.
+  `fish -n`, the PowerShell parser, JSON/TOML/YAML/Lua checks, `git config`,
+  `ssh -G -F`, Emacs `check-parens` and `actionlint` when those tools are
+  installed. It finds `python3` or `python` (ignoring broken Store aliases) and
+  falls back to `ConvertFrom-Json` for the Windows JSON check. It also fails
+  when the index or working tree contains CRLF (the repository is LF-only).
 
 ## chezmoi rules that are easy to get wrong
 
@@ -39,25 +42,33 @@ this file only records what agents otherwise get wrong.
   templates, and `.chezmoiignore` patterns match **target** paths.
 - Every source file is a managed target unless listed in `.chezmoiignore`. New
   root docs must be added there or they get copied into `$HOME` (README.md and
-  AGENTS.md are ignored this way). Repo-only tooling (`.editorconfig`,
-  `.gitattributes`, `.shellcheckrc`, `.github/**`, `scripts/**`, and the
-  `bootstrap.*.tmpl` sources) is ignored for the same reason.
+  AGENTS.md are ignored this way). Repo-only tooling (`.gitattributes`,
+  `.shellcheckrc`, `.github/**`, `scripts/**`, and the `bootstrap.*.tmpl`
+  sources) is ignored for the same reason. The managed `~/.editorconfig` comes
+  from `dot_editorconfig.tmpl`, which includes the repo `.editorconfig` so both
+  stay in sync. Do **not** add `.editorconfig` to `.chezmoiignore`: patterns
+  match target paths, so it would also ignore the managed `~/.editorconfig`.
 - Scripts run in lexical order (`10-`, `20-` prefixes); `before_`/`after_` choose
   the apply phase.
 - Any rendered byte change in a `run_onchange_` script (even a comment) makes
   chezmoi re-run it on the next apply. Don't edit them casually on a live box.
 - A `run_onchange_` script that exits 0 is recorded as done even when a
   download failed, so the package scripts verify the tools they are
-  responsible for at the end (Node.js after fnm, prettier, AWS CDK) and exit
-  non-zero when one is still missing. chezmoi then reports the failure and
-  re-runs the script on the next apply. Individual install failures stay
-  warnings so the rest of the list is still attempted.
+  responsible for at the end (Node.js after fnm, prettier, AWS CDK, git-lfs)
+  and exit non-zero when one is still missing. chezmoi then reports the failure
+  and re-runs the script on the next apply. Individual install failures stay
+  warnings so the rest of the list is still attempted; a failed apt batch is
+  retried one package at a time and a failed Homebrew batch the same way.
 - Adding software means editing the `run_onchange_` install scripts, not
   `bootstrap.*`; bootstrap only installs chezmoi and calls `chezmoi init`.
 - `bootstrap.sh` and `bootstrap.ps1` are generated from `bootstrap.*.tmpl` by
   `scripts/render-bootstrap.sh` so they stay standalone while sharing helpers
   from `scripts/lib/`. Edit the templates or libraries, run the renderer, and
   commit both generated files; `scripts/check.sh` fails when they are stale.
+  Both accept a repo override and a branch/tag (`--repo`/`--ref`,
+  `CHEZMOI_REPO`/`CHEZMOI_REF`, `-Repo`/`-Ref`); an explicit repo wins,
+  otherwise a local checkout is used, and `--ref` only applies to cloned
+  sources.
 
 ## Non-negotiable cross-OS invariants
 
@@ -89,6 +100,20 @@ this file only records what agents otherwise get wrong.
   which `run_onchange_after_45-wsl-ssh.sh.tmpl` moves to port 2222. The script
   exits on non-WSL kernels, so Ubuntu Server keeps port 22; macOS and Windows
   provide their own SSH servers and need no package entry.
+  `wslu` is the conditional exception: it is added to the Linux `PACKAGES`
+  string behind `{{ if .isWSL }}` because it provides `wslview` for `BROWSER`
+  only inside WSL2. It has no Homebrew or winget counterpart.
+  `git-lfs` (`git-lfs` on apt/Homebrew, `GitHub.GitLFS` on winget) and
+  `git-delta` (`git-delta` on apt/Homebrew, `dandavison.delta` on winget) are
+  mandatory in all three lists. The LFS clean/smudge/process filters live in
+  `dot_gitconfig.tmpl`; never run `git lfs install`, because it edits the
+  managed `~/.gitconfig` and the next `chezmoi apply` removes the filters.
+  `core.pager` is `delta || less -FRX`, so a missing delta still leaves a
+  working pager. `direnv` is also in all three lists and is hooked by fish and
+  the PowerShell profile.
+  Ubuntu names the `fd` and `bat` binaries `fdfind` and `batcat`; the Linux
+  package script links them into `~/.local/bin` as `fd` and `bat` for scripts,
+  fzf, Emacs and non-fish shells. Keep the fish wrappers as the fallback.
 - Desktop-only extras are intentional: WeChat DevTools and Postman are
   development tools installed on macOS (`postman`, `wechatwebdevtools` casks)
   and Windows (`Postman.Postman`, `Tencent.WeixinDevTools`), not on Linux. The
@@ -143,8 +168,27 @@ this file only records what agents otherwise get wrong.
 - Shell abbreviations are defined twice: fish in
   `dot_config/fish/config.fish.tmpl` and PowerShell in the PS7 profile. Keep
   the two lists in sync; use functions in PowerShell where the alias needs
-  arguments (`ll`, `za`, `e`, …). Both shells define `e` → `emacs -nw`; the
-  profile only adds it when `emacs` is on `PATH`.
+  arguments (`ll`, `za`, `e`, …). Both shells define `e` → `emacs -nw`, the
+  same `gco`/`gsw`/`grb`/`gaa`/`gpush`/`gpull` Git helpers, `mkcd` and
+  `reload`; the profile only adds `e` when `emacs` is on `PATH`.
+- Shared tool configs use one environment variable per tool so the same file
+  works on all three platforms: `BAT_CONFIG_PATH`, `RIPGREP_CONFIG_PATH`,
+  `GH_CONFIG_DIR` and `LG_CONFIG_FILE`. fish and the PS7 profile must export
+  all four; `dot_config/bat/config`, `dot_config/ripgrep/config`,
+  `dot_config/gh/config.yml` and `dot_config/lazygit/config.yml` are the
+  managed files. `GH_CONFIG_DIR` also keeps `gh auth login` data out of
+  `%APPDATA%`; `hosts.yml` stays unmanaged.
+- `dot_ssh/config.tmpl` manages `~/.ssh/config`: `Include ~/.ssh/config.d/*.conf`
+  first, keepalives, `AddKeysToAgent`, and ControlMaster/ControlPath/
+  ControlPersist on Unix only (Windows OpenSSH does not multiplex). Put
+  machine-specific hosts in `~/.ssh/config.d`, never in the managed file.
+- `dot_gitconfig.tmpl` owns `core.pager`, `interactive.diffFilter`, the LFS
+  filters, `core.autocrlf` (false on Unix, input on Windows), `longpaths` on
+  Windows, and the global aliases. `dot_config/git/attributes` is the
+  `core.attributesFile`; `dot_gitignore_global` is `core.excludesFile`.
+  `empty_dot_hushlogin` is an empty managed target that suppresses the login
+  banner; the `empty_` prefix is required because chezmoi treats an empty
+  source file as a no-op.
 - `.chezmoi.kernel` is empty on Windows, so `.chezmoi.kernel.osrelease` must
   stay behind `eq .chezmoi.os "linux"` (this previously crashed `chezmoi init`
   on Windows).
@@ -209,16 +253,23 @@ this file only records what agents otherwise get wrong.
   includes `scripts/lib/path.ps1`; add logic only to the PS7 template.
 - The profile sets `XDG_*` and `ZELLIJ_CONFIG_DIR` so Neovim, Starship, Zellij
   and WezTerm read `~/.config`. Removing them silently breaks all four. It also
-  sets `SHELL` (`pwsh` on 7, `powershell` on 5.1) so Zellij panes do not fall
-  back to `cmd.exe`; keep the version check because 5.1 dot-sources this file.
-  It also adds `%APPDATA%\npm` to `PATH` (npm global installs of prettier and
-  aws-cdk) and runs `fnm env --use-on-cd --shell powershell`; the Node.js MSI
-  used to provide both, so removing them breaks `node`, `cdk` and `prettier`.
+  exports `BAT_CONFIG_PATH`, `RIPGREP_CONFIG_PATH`, `GH_CONFIG_DIR` and
+  `LG_CONFIG_FILE`, `DO_NOT_TRACK`, and `POWERSHELL_TELEMETRY_OPTOUT`, hooks
+  direnv, maps Ctrl+R/Ctrl+T to fzf when available, and forces UTF-8 output.
+  It sets `SHELL` (`pwsh` on 7, `powershell` on 5.1) so Zellij panes do not
+  fall back to `cmd.exe`; keep the version check because 5.1 dot-sources this
+  file. It also adds `%APPDATA%\npm` to `PATH` (npm global installs of prettier
+  and aws-cdk), `%ProgramFiles%\Git LFS` when present, and runs
+  `fnm env --use-on-cd --shell powershell`; the Node.js MSI used to provide the
+  npm paths, so removing them breaks `node`, `cdk` and `prettier`.
 - Windows Terminal is the default Windows client. Its settings are the managed
   target `AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json`,
   which must stay in `.chezmoiignore` on non-Windows. PowerShell 7 is
   `defaultProfile` (GUID `{574e775e-4f2a-5b96-ac1e-a2962a402336}`); the Ubuntu
-  profile runs `wsl.exe -d Ubuntu --cd ~`.
+  profile runs `wsl.exe -d Ubuntu --cd ~`. Keep the font at
+  `cellHeight: "1.5"`; it is intentionally taller than WezTerm's 1.1 and was
+  manually tuned. Copy-on-select, no copy formatting, trimmed paste and compact
+  tabs are also intentional.
 - WezTerm remains installed as the WSL-only alternative and defaults to the
   `WSL:Ubuntu` domain. There is no PowerShell/cmd launch entry; do not add one
   back.
@@ -230,7 +281,9 @@ this file only records what agents otherwise get wrong.
 - Windows SSH is enabled by `run_onchange_after_35-windows-ssh.ps1.tmpl` from
   the built-in `OpenSSH.Server~~~~0.0.1.0` capability, not winget: it sets the
   `sshd` service to Automatic, starts it, and adds a `Windows SSH (TCP 22)`
-  inbound firewall rule on the `Any` profile. It also sets
+  inbound firewall rule on the `Any` profile. It also sets the
+  `ssh-agent` service (OpenSSH Authentication Agent) to Automatic and starts
+  it, because `dot_ssh/config.tmpl` sets `AddKeysToAgent yes`. It sets
   `HKLM:\SOFTWARE\OpenSSH\DefaultShell` to PowerShell 7 (`pwsh.exe`) and
   `DefaultShellCommandOption` to `-c`, preferring
   `%ProgramFiles%\PowerShell\7\pwsh.exe`, then a discovered non-alias
@@ -243,12 +296,16 @@ this file only records what agents otherwise get wrong.
 - `dot_wslconfig` is the Windows-only target `~/.wslconfig` and must stay under
   the non-Windows branch of `.chezmoiignore`. It sets
   `networkingMode=mirrored`, which puts the WSL2 distribution on the Windows
-  host's interfaces. WSL reads the file only when a distribution starts, so
-  `wsl --shutdown` is required after it changes. The same 40 script creates
-  inbound Windows Firewall **and** Hyper-V firewall rules for TCP 2222 (SSH)
-  and UDP 60000-61000 (mosh), because mirrored mode is filtered by both. The
-  rules use the `Any` profile; do not remove the elevated-shell warning, and
-  keep the `{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}` WSL VMCreatorId.
+  host's interfaces; `autoMemoryReclaim=gradual`, `sparseVhd`, `firewall` and
+  `hostAddressLoopback` are part of the same low-risk baseline. Do not add
+  `dnsTunneling` or `autoProxy`: this machine's VPN runs on the router, so WSL
+  should use the host's normal DNS and proxy behavior. WSL reads the file only
+  when a distribution starts, so `wsl --shutdown` is required after it changes.
+  The same 40 script creates inbound Windows Firewall **and** Hyper-V firewall
+  rules for TCP 2222 (SSH) and UDP 60000-61000 (mosh), because mirrored mode is
+  filtered by both. The rules use the `Any` profile; do not remove the
+  elevated-shell warning, and keep the
+  `{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}` WSL VMCreatorId.
 - WSL2 Ubuntu listens on SSH port 2222 so it does not collide with the Windows
   OpenSSH server on 22. `run_onchange_after_45-wsl-ssh.sh.tmpl` writes
   `/etc/ssh/sshd_config.d/00-chezmoi-wsl.conf` and
@@ -294,6 +351,13 @@ this file only records what agents otherwise get wrong.
 
 ## Generated content
 
+- `.editorconfig` is repo-only and the source for `dot_editorconfig.tmpl`,
+  which manages `~/.editorconfig` with `include`. Do not duplicate the rules in
+  both files.
+- `dot_config/zellij/config.kdl.tmpl` is a template so it can set
+  `default_shell "pwsh"` on Windows and `"fish"` on Unix; the Windows profile
+  points `ZELLIJ_CONFIG_DIR` at it. Keep `theme "catppuccin-mocha"`, which is a
+  built-in zellij theme.
 - `dot_config/starship.toml` is the `catppuccin-powerline` preset plus one
   local override: `[python] python_binary` tries
   `uv run --no-python-downloads --no-project python` and then falls back to

@@ -90,6 +90,24 @@ try {
     Write-Warning 'If WSL is holding port 22, run "wsl --shutdown"; WSL sshd must use 2222.'
 }
 
+# Start the OpenSSH Authentication Agent so AddKeysToAgent in the managed
+# ~/.ssh/config works. Windows ships the service Disabled, so a key passphrase
+# would otherwise be typed on every connection.
+$agent = Get-Service -Name ssh-agent -ErrorAction SilentlyContinue
+if (-not $agent) {
+    Write-Warning 'The OpenSSH Authentication Agent service is not available.'
+} else {
+    try {
+        Set-Service -Name ssh-agent -StartupType Automatic -ErrorAction Stop
+        if ($agent.Status -ne 'Running') {
+            Start-Service -Name ssh-agent -ErrorAction Stop
+        }
+        Write-Host 'OpenSSH Authentication Agent is running.'
+    } catch {
+        Write-Warning "Could not start the OpenSSH Authentication Agent: $($_.Exception.Message)"
+    }
+}
+
 # The built-in OpenSSH rule is scoped to sshd.exe and normally Private/Domain.
 # Add an explicit Any-profile rule so LAN clients can reach port 22 on Public
 # networks too. The WSL rules live in run_onchange_after_40-wsl.ps1.tmpl.

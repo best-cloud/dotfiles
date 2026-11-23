@@ -1,0 +1,29 @@
+// Managed by chezmoi: dot_config/zellij/config.kdl.tmpl -> config.kdl.
+// Kept small so zellij upgrades do not break it. Run `zellij setup
+// --dump-config` to see every available option.
+//
+// The Windows profile points ZELLIJ_CONFIG_DIR at ~/.config/zellij because
+// zellij ignores XDG_CONFIG_HOME on Windows.
+simplified_ui true
+show_startup_tips false
+show_release_notes false
+
+// Catppuccin Mocha matches the managed Windows Terminal, WezTerm, Ghostty,
+// bat and Starship themes. It is a built-in zellij theme.
+theme "catppuccin-mocha"
+
+// A click selects a pane; use Shift to bypass for terminal mouse reporting.
+mouse_mode true
+// Frames steal a column from every pane; the pane border and tab bar already
+// make the layout clear.
+pane_frames false
+// Keep enough scrollback for builds and test output without unbounded RAM.
+scroll_buffer_size 50000
+
+// Start the configured login shell explicitly. Without this, zellij falls back
+// to $SHELL or cmd.exe, which differs between the Windows profile and WSL.
+{{ if eq .chezmoi.os "windows" -}}
+default_shell "pwsh"
+{{ else -}}
+default_shell "fish"
+{{ end -}}

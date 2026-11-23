@@ -1,0 +1,18 @@
+# Managed by chezmoi: dot_config/ripgrep/config.
+#
+# Read by rg through RIPGREP_CONFIG_PATH, which fish and the PowerShell profile
+# export. Keep the ignores in sync with dot_gitignore_global: these are build
+# and editor artifacts that are never worth searching.
+--smart-case
+--hidden
+--glob=!.git/
+--glob=!node_modules/
+--glob=!.venv/
+--glob=!venv/
+--glob=!__pycache__/
+--glob=!dist/
+--glob=!build/
+--glob=!target/
+--glob=!cdk.out/
+--glob=!.direnv/
+--glob=!*.log

@@ -16,6 +16,7 @@ if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
 $packages = @(
     'Microsoft.PowerShell'
     'Git.Git'
+    'GitHub.GitLFS'
     'Microsoft.WindowsTerminal'
     'Microsoft.WSL'
     'wez.wezterm'
@@ -27,6 +28,8 @@ $packages = @(
     'junegunn.fzf'
     'ajeetdsouza.zoxide'
     'jqlang.jq'
+    'direnv.direnv'
+    'dandavison.delta'
     'Neovim.Neovim'
     'GNU.Emacs'
     'GitHub.cli'
@@ -136,6 +139,24 @@ if ($npmCmd) {
 } else {
     Write-Warning 'npm was not found; prettier and aws-cdk were not installed'
     $missing += 'prettier', 'aws-cdk'
+}
+
+# git-lfs is mandatory: the managed .gitconfig defines its clean/smudge
+# filters, so a failed winget install must keep this script scheduled.
+# The Git LFS installer updates the persisted PATH, which this process does not
+# see yet; probe its default install directory first.
+$gitLfsBin = Join-Path $env:ProgramFiles 'Git LFS'
+if (Test-Path (Join-Path $gitLfsBin 'git-lfs.exe')) {
+    $env:Path = "$gitLfsBin;$env:Path"
+}
+if (Get-Command git -ErrorAction SilentlyContinue) {
+    git lfs version *> $null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning 'git-lfs is missing; LFS repositories will fail to check out'
+        $missing += 'git-lfs'
+    }
+} else {
+    $missing += 'git-lfs'
 }
 
 Write-Host 'Windows packages complete. Open a new terminal to pick up PATH changes.'

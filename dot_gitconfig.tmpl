@@ -9,11 +9,52 @@
 
 [core]
     editor = {{ .editor }}
-    pager = less -FRX
+    # delta is installed by the package scripts. The fallback keeps git usable
+    # on a machine where that install failed: git runs the pager through a
+    # shell, so the second command only runs when delta is missing.
+    pager = delta || less -FRX
     excludesFile = ~/.gitignore_global
+    # LFS filters live here instead of being written by `git lfs install`, so
+    # `chezmoi apply` never strips them from the managed .gitconfig.
+    attributesFile = ~/.config/git/attributes
+
+[filter "lfs"]
+    clean = git-lfs clean -- %f
+    smudge = git-lfs smudge -- %f
+    process = git-lfs filter-process
+    required = true
 
 [color]
     ui = auto
+
+[interactive]
+    # Colorize only, so `git add -p` still sees and edits the raw hunk text.
+    diffFilter = delta --color-only || cat
+
+[delta]
+    navigate = true
+    line-numbers = true
+    hyperlinks = true
+    syntax-theme = Catppuccin Mocha
+
+[diff]
+    algorithm = histogram
+    colorMoved = zebra
+    renames = copies
+    mnemonicPrefix = true
+    context = 3
+
+[merge]
+    conflictstyle = zdiff3
+
+[rebase]
+    autosquash = true
+    autoStash = true
+    updateRefs = true
+
+[rerere]
+    enabled = true
+    autoupdate = true
 
 [pull]
     rebase = true
@@ -24,29 +65,68 @@
 [fetch]
     prune = true
 
-[rebase]
-    autosquash = true
+[branch]
+    sort = -committerdate
 
-[merge]
-    conflictstyle = zdiff3
+[tag]
+    sort = version:refname
+
+[column]
+    ui = auto
+
+[log]
+    date = iso
+
+[commit]
+    verbose = true
+
+[help]
+    autocorrect = prompt
+
+[advice]
+    detachedHead = false
+
+[protocol]
+    version = 2
 
 [alias]
     st = status -sb
     co = checkout
     br = branch
     ci = commit
+    sw = switch
     lg = log --oneline --graph --decorate --all
     last = log -1 HEAD
+    root = rev-parse --show-toplevel
     unstage = reset HEAD --
     amend = commit --amend --no-edit
+    undo = reset --soft HEAD~1
+    uncommit = reset --mixed HEAD~1
+    fixup = commit --fixup
+    wip = !git add -A && git commit -m wip
+    stash-all = stash push --include-untracked
+    aliases = "config --get-regexp ^alias\\."
 
-{{ if eq .chezmoi.os "linux" -}}
-[credential]
-    helper = cache --timeout=3600
-{{ else if eq .chezmoi.os "darwin" -}}
-[credential]
-    helper = osxkeychain
-{{ else if eq .chezmoi.os "windows" -}}
+{{ if eq .chezmoi.os "windows" -}}
+[core]
+    # Repository content and the working tree stay LF; Git for Windows' default
+    # (true) would put CRLF in checkouts and make cross-platform diffs noisy.
+    autocrlf = input
+    # Deep node_modules and monorepo paths exceed MAX_PATH on Windows.
+    longpaths = true
+
 [credential]
     helper = manager
+{{ else if eq .chezmoi.os "darwin" -}}
+[core]
+    autocrlf = false
+
+[credential]
+    helper = osxkeychain
+{{ else -}}
+[core]
+    autocrlf = false
+
+[credential]
+    helper = cache --timeout=3600
 {{ end -}}
