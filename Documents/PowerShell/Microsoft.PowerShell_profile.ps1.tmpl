@@ -131,6 +131,152 @@ function reload {
 }
 
 # ---------------------------------------------------------------------------
+# ssh-copy-id: Windows OpenSSH ships ssh and ssh-keygen but not the
+# ssh-copy-id contrib script from Linux, so install a public key here.
+# ---------------------------------------------------------------------------
+function ssh-copy-id {
+    param(
+        [Parameter(Position = 0)]
+        [string] $Target,
+
+        # Linux: -i [identity_file]; defaults to the newest ~/.ssh/id*.pub.
+        [Alias('i')]
+        [string] $IdentityFile,
+
+        [Alias('p')]
+        [ValidateRange(1, 65535)]
+        [int] $Port,
+
+        # Linux: -o ssh_option. PowerShell cannot repeat a named parameter, so
+        # pass several options as a comma-separated list.
+        [Alias('o')]
+        [string[]] $SshOption,
+
+        # Linux: -F ssh_config. PowerShell parameter names are case-insensitive,
+        # so -F would collide with the -f switch below and needs its own name.
+        [string] $SshConfig,
+
+        # Linux: -f, force mode (skip the "already installed" check).
+        [switch] $f,
+
+        # Linux: -n, dry run (print the key, install nothing).
+        [switch] $n,
+
+        [Alias('h')]
+        [switch] $Help
+    )
+
+    if ($Help -or -not $Target) {
+        Write-Host @'
+Usage: ssh-copy-id [-h] [-f] [-n] [-i identity_file] [-p port] [-o ssh_option[,ssh_option]] [-SshConfig ssh_config] [user@]hostname
+
+        -h                  print this help
+        -f                  force mode: install the key even if the remote has it
+        -n                  dry run: show the key without connecting
+        -i identity_file    public key to install (default: newest ~/.ssh/id*.pub)
+        -p port             port to connect to
+        -o ssh_option       pass an option to ssh (comma-separate several)
+        -SshConfig file     use an alternative ssh configuration (Linux: -F)
+
+Example: ssh-copy-id -p 2222 user@example.com
+'@
+        return
+    }
+
+    $sshExe = Get-Command ssh -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1 -ExpandProperty Source
+    if (-not $sshExe) {
+        $sshExe = Join-Path $env:SystemRoot 'System32\OpenSSH\ssh.exe'
+    }
+    if (-not (Test-Path -LiteralPath $sshExe)) {
+        throw 'ssh was not found; install the OpenSSH Client capability first.'
+    }
+
+    if ($IdentityFile) {
+        $keyPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($IdentityFile)
+        if ($keyPath -notlike '*.pub') { $keyPath = "$keyPath.pub" }
+        if (-not (Test-Path -LiteralPath $keyPath -PathType Leaf)) {
+            throw "Identity file not found: $keyPath"
+        }
+    } else {
+        # Same default as the Linux script: the newest id*.pub without -cert.
+        $keyPath = Get-ChildItem -LiteralPath (Join-Path $HOME '.ssh') -Filter 'id*.pub' -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notlike '*-cert.pub' } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+        if (-not $keyPath) {
+            throw 'No identities found in ~/.ssh; create one with: ssh-keygen -t ed25519'
+        }
+    }
+
+    # Normalise CRLF so the remote authorized_keys gets a clean one-line key,
+    # then trim: the newline is re-added when the key is piped to ssh.
+    $key = ((Get-Content -LiteralPath $keyPath -Raw) -replace "`r", '').Trim()
+    if (-not $key) {
+        throw "Identity file is empty: $keyPath"
+    }
+
+    $sshArgs = @()
+    if ($Port) { $sshArgs += @('-p', [string]$Port) }
+    if ($SshConfig) {
+        $sshArgs += @('-F', $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($SshConfig))
+    }
+    foreach ($option in $SshOption) {
+        $sshArgs += @('-o', $option)
+    }
+
+    # One POSIX shell session installs the key: it appends the key from stdin,
+    # creating ~/.ssh and authorized_keys with the usual permissions. Without
+    # -f an existing key is skipped instead of duplicated. The sentinel keeps
+    # login banners out of the result handling.
+    $install = 'cd; umask 077; mkdir -p .ssh && chmod 700 .ssh && touch .ssh/authorized_keys && chmod 600 .ssh/authorized_keys || exit 1; key=$(cat); [ -n "$key" ] || exit 1; '
+    if ($f) {
+        $install += 'echo "$key" >> .ssh/authorized_keys || exit 1; echo __ssh_copy_id_added__'
+    } else {
+        $install += 'if grep -qxF -- "$key" .ssh/authorized_keys 2>/dev/null; then echo __ssh_copy_id_present__; else echo "$key" >> .ssh/authorized_keys || exit 1; echo __ssh_copy_id_added__; fi'
+    }
+    $remoteCommand = "exec sh -c '$install'"
+
+    Write-Host "ssh-copy-id: INFO: Source of key(s) to be installed: $keyPath"
+    if ($n) {
+        Write-Host '=-=-=-=-=-=-=-='
+        Write-Host 'Would have added the following key(s):'
+        Write-Host ''
+        Write-Host $key
+        Write-Host '=-=-=-=-=-=-=-='
+        return
+    }
+
+    $output = @($key | & $sshExe @sshArgs $Target $remoteCommand 2>&1)
+    $status = $LASTEXITCODE
+    $stdout = @($output | ForEach-Object { [string]$_ })
+
+    if ($status -ne 0) {
+        $text = ($stdout -join "`n").Trim()
+        if ($text) { Write-Host $text }
+        throw "ssh-copy-id: failed to copy the key to $Target (ssh exited with $status)."
+    }
+
+    # Match the sentinel as a whole line so banners cannot trigger it.
+    $present = $false
+    foreach ($line in $stdout) {
+        if ($line.Trim() -eq '__ssh_copy_id_present__') { $present = $true; break }
+    }
+    if ($present) {
+        Write-Warning 'ssh-copy-id: WARNING: All keys were skipped because they already exist on the remote system.'
+        Write-Warning '        (if you think this is a mistake, you may want to use the -f option)'
+        return
+    }
+
+    $sshPreview = (@('ssh') + $sshArgs + @($Target)) -join ' '
+    Write-Host ''
+    Write-Host 'Number of key(s) added: 1'
+    Write-Host ''
+    Write-Host "Now try logging into the machine, with: $sshPreview"
+    Write-Host 'and check to make sure that only the key(s) you wanted were added.'
+}
+
+# ---------------------------------------------------------------------------
 # Prompt
 # ---------------------------------------------------------------------------
 if (Get-Command starship -ErrorAction SilentlyContinue) {

@@ -711,7 +711,10 @@ The PowerShell 7 profile defines the same aliases and abbreviations as the fish
 config, so the two shells stay consistent across platforms. It also exports the
 same shared config paths, hooks direnv, and maps Ctrl+R/Ctrl+T to fzf history
 and file pickers when fzf is installed. The 5.1 shim inherits everything by
-dot-sourcing that profile.
+dot-sourcing that profile. Because Windows OpenSSH ships `ssh` and `ssh-keygen`
+but not Linux's `ssh-copy-id` script, the profile provides an `ssh-copy-id`
+function with the same flags; PowerShell is case-insensitive, so Linux's `-F`
+is spelled `-SshConfig`.
 
 `run_onchange_after_20-default-shell.sh.tmpl` adds the fish path to
 `/etc/shells` when needed and runs `chsh`. Log out and back in (or run

@@ -289,6 +289,15 @@ behavior; this file only records what agents otherwise get wrong.
   and aws-cdk), `%ProgramFiles%\Git LFS` when present, and runs
   `fnm env --use-on-cd --shell powershell`; the Node.js MSI used to provide the
   npm paths, so removing them breaks `node`, `cdk` and `prettier`.
+- `ssh-copy-id` is an OpenSSH contrib script that ships on Linux but not with
+  the Windows OpenSSH client, so the PS7 profile defines a function with the
+  same flags (`-i`, `-p`, `-o`, `-f`, `-n`, `-h`). It pipes one public key into
+  a single `ssh` session (`exec sh -c '…'`) that creates `~/.ssh` and
+  `authorized_keys` with 700/600 and skips a key the remote already has unless
+  `-f` is given. Do not add a package for it. PowerShell parameter names are
+  case-insensitive, so Linux's `-F` (alternative `ssh_config`) is spelled
+  `-SshConfig`; `-i` takes a value and defaults to the newest
+  `~/.ssh/id*.pub` without `-cert.pub`.
 - Windows Terminal is the default Windows client. Its settings are the managed
   target `AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json`,
   which must stay in `.chezmoiignore` on non-Windows. PowerShell 7 is
