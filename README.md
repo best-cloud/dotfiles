@@ -794,14 +794,13 @@ when that matters.
   cleanly when it is not elevated. Launch Ubuntu once after it is registered to
   create the Linux user.
 - The managed `~/.wslconfig` keeps `networkingMode=mirrored` and
-  `firewall=true`, and puts `autoMemoryReclaim=gradual` (return idle RAM to
-  Windows), `sparseVhd=true` and `hostAddressLoopback=true` under
-  `[experimental]`, where this WSL build still expects them. DNS tunneling and
-  automatic proxy forwarding are deliberately omitted because this machine's
-  VPN lives on the router, not on Windows. The same script creates the Windows
-  Firewall and Hyper-V firewall rules for SSH on TCP 2222 and mosh on UDP
-  60000-61000. Run `wsl --shutdown` after the first apply so WSL picks up the
-  new settings; create the rules from an elevated shell.
+  `firewall=true`. It intentionally sets no memory, VHD or `[experimental]`
+  options: this machine has very large disk and memory, and WSL's defaults are
+  preferable to fixed caps. DNS tunneling and automatic proxy forwarding are
+  also omitted because the VPN lives on the router, not on Windows. The same
+  script creates the Windows Firewall and Hyper-V firewall rules for SSH on TCP
+  2222 and mosh on UDP 60000-61000. Run `wsl --shutdown` after the first apply
+  so WSL picks up the new settings; create the rules from an elevated shell.
 - Run `bootstrap.sh` inside the WSL distro as well; the two sides are
   independent chezmoi installations.
 
