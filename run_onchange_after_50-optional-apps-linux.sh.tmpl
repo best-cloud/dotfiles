@@ -34,7 +34,10 @@ fi
 if ! has deno; then
     echo "==> installing deno (not packaged by apt)"
     # --no-modify-path: fish and the PowerShell profile add ~/.deno/bin.
-    install_from_url deno https://deno.land/install.sh sh --no-modify-path
+    # -y: without it the bundled shell setup still asks "Edit shell configs to
+    # add deno to the PATH?" with a default of yes and appends a source line to
+    # ~/.bashrc and ~/.profile even though --no-modify-path was passed.
+    install_from_url deno https://deno.land/install.sh sh -y --no-modify-path
     hash -r 2>/dev/null || true
 fi
 

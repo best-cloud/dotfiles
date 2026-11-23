@@ -157,8 +157,10 @@ behavior; this file only records what agents otherwise get wrong.
   Windows, the same prefixes as prettier.
 - Optional yt-dlp always gets its strongly recommended dependencies: ffmpeg/
   ffprobe, yt-dlp-ejs and Deno. Linux installs ffmpeg with apt, Deno with the
-  upstream installer into `~/.deno/bin` (`--no-modify-path`, added by fish and
-  the profile) and `yt-dlp[default]` with uv; macOS uses the `ffmpeg`, `deno`
+  upstream installer into `~/.deno/bin` (`-y --no-modify-path`, added by fish
+  and the profile; without `-y` the bundled shell setup still prompts and
+  defaults to editing `~/.bashrc` and `~/.profile`) and `yt-dlp[default]` with
+  uv; macOS uses the `ffmpeg`, `deno`
   and `yt-dlp` formulae; Windows uses `yt-dlp.FFmpeg`, `DenoLand.Deno` and
   `yt-dlp.yt-dlp`. `dot_config/yt-dlp/config` selects `--js-runtimes deno`,
   allows `--remote-components ejs:npm` and sets
