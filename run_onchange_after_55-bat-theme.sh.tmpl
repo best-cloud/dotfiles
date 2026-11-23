@@ -1,0 +1,29 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/sh
+# Compile the managed Catppuccin theme into bat's cache on Linux.
+#
+# Ubuntu 26.04 packages bat 0.25.0, which predates the Catppuccin themes that
+# dot_config/bat/config selects (bat 0.26.0 bundles them, as do the Homebrew and
+# winget packages). The theme is managed in dot_config/bat/themes on Linux only
+# and has to be built into bat's cache; Windows and macOS already have it.
+#
+# bat caches the compiled theme set in ~/.cache/bat, so removing that directory
+# also removes the theme until this script runs again (or `bat cache --build`).
+set -eu
+
+{{ include "scripts/lib/shell.sh" }}
+if ! native_cmd bat; then
+    echo "warning: bat is not installed; skipping the theme cache build" >&2
+    exit 0
+fi
+
+if bat --list-themes 2>/dev/null | grep -qxF 'Catppuccin Mocha'; then
+    exit 0
+fi
+
+echo "==> building the bat theme cache (Catppuccin Mocha)"
+if ! bat cache --build; then
+    echo "error: bat cache --build failed; bat keeps its default theme" >&2
+    exit 1
+fi
+{{ end -}}

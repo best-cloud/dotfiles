@@ -10,6 +10,12 @@ Design principles:
   immediately: `fd`/`bat` under their upstream names, a Catppuccin theme
   everywhere, `fzf` history search, SSH connection reuse, Git LFS and delta,
   and one `chezmoi apply` to repair the whole setup.
+- **Catppuccin Mocha on the command line** — every CLI/TUI tool with an
+  official Catppuccin port uses the Mocha flavor with the mauve accent: bat,
+  btop, delta, eza, fish, fzf, lazygit, OpenCode, PowerShell, Starship, tmux and
+  Zellij. The terminals and Windows Terminal already use it. Editors are
+  deliberately outside this list: the Neovim config stays plugin-free and
+  Spacemacs keeps its own theme.
 - **Package manager first** — apt on Ubuntu/WSL, Homebrew on macOS, winget on
   Windows. Upstream installers are only a fallback for tools a distro does not
   package.
@@ -438,7 +444,7 @@ binary formats.
 Machine-specific hosts, jump hosts and keys belong in `~/.ssh/config.d/*.conf`,
 which is included first and is deliberately unmanaged.
 
-### bat, ripgrep, gh and lazygit
+### bat, eza, ripgrep, gh and lazygit
 
 These tools otherwise look in a platform-specific directory. The managed fish
 and PowerShell environments set one path for all three operating systems, so
@@ -447,12 +453,46 @@ each tool has a single config file:
 | Tool | Environment variable | Managed file |
 |---|---|---|
 | bat | `BAT_CONFIG_PATH` | `dot_config/bat/config` (Catppuccin Mocha, line numbers) |
+| eza | `EZA_CONFIG_DIR` | `dot_config/eza/theme.yml` (Catppuccin Mocha, mauve accent) |
 | ripgrep | `RIPGREP_CONFIG_PATH` | `dot_config/ripgrep/config` (smart case, hidden, build-dir ignores) |
 | GitHub CLI | `GH_CONFIG_DIR` | `dot_config/gh/config.yml` (SSH protocol, `gh pc/pv/co` aliases) |
 | lazygit | `LG_CONFIG_FILE` | `dot_config/lazygit/config.yml` (Catppuccin theme, Nerd Font v3) |
 
+Ubuntu 26.04 packages bat 0.25.0, which predates the Catppuccin themes bundled
+by bat 0.26.0. The theme is therefore managed in `dot_config/bat/themes/` on
+Linux, and `run_onchange_after_55-bat-theme.sh.tmpl` compiles it into bat's
+cache; the Homebrew and winget builds already include it, so the theme file is
+ignored on macOS and Windows.
+
 Authentication stays out of the repo: `gh auth login` writes
 `~/.config/gh/hosts.yml`, which chezmoi does not manage.
+
+### Catppuccin Mocha everywhere
+
+Every command-line tool that has an official Catppuccin port uses the Mocha
+flavor with the mauve accent, so prompts, diffs, syntax highlighting and TUIs
+share one palette:
+
+| Tool | Managed configuration |
+|---|---|
+| bat | `dot_config/bat/config`; Linux also gets `dot_config/bat/themes/Catppuccin Mocha.tmTheme` because Ubuntu 26.04 ships bat 0.25 |
+| btop | `dot_config/btop/btop.conf` plus `dot_config/btop/themes/catppuccin_mocha.theme` |
+| delta | `dot_config/delta/themes/catppuccin.gitconfig`, included from `dot_gitconfig.tmpl` with `features = catppuccin-mocha` |
+| eza | `dot_config/eza/theme.yml`, found through `EZA_CONFIG_DIR` |
+| fish | `dot_config/fish/themes/catppuccin-mocha.theme`, selected with `fish_config theme choose` |
+| fzf | `FZF_DEFAULT_OPTS`, identical in fish and the PowerShell profile |
+| lazygit | `dot_config/lazygit/config.yml` |
+| OpenCode | `dot_config/opencode/cli.json` (built-in `catppuccin` theme; CLI settings, not `opencode.json`) |
+| PowerShell | `Documents/PowerShell/Modules/Catppuccin` (vendored port) supplies the PSReadLine and `$PSStyle` colors |
+| Starship | `dot_config/starship.toml` (`catppuccin_mocha` palette) |
+| tmux | `dot_config/tmux/tmux.conf` plus the cloned `catppuccin/tmux` plugin |
+| Zellij | `dot_config/zellij/config.kdl.tmpl` (built-in theme) |
+
+The bat theme, btop theme, delta gitconfig, eza YAML, fish theme and PowerShell
+module are copied verbatim from the upstream Catppuccin ports. `htop` has no
+Catppuccin port, so it keeps its own colors. Editors are outside this list on
+purpose: `dot_config/nvim/init.lua` stays plugin-free and Spacemacs keeps its
+own theme.
 
 ### Editor and login polish
 
@@ -492,13 +532,24 @@ and keeps Markdown trailing spaces.
 ├── dot_wslconfig                       # Windows-only mirrored WSL networking
 ├── dot_spacemacs                       # default Spacemacs develop dotfile + TUNA ELPA
 ├── dot_config/
-│   ├── bat/config                      # shared bat config (BAT_CONFIG_PATH)
+│   ├── bat/
+│   │   ├── config                      # shared bat config (BAT_CONFIG_PATH)
+│   │   └── themes/Catppuccin Mocha.tmTheme  # Linux-only: bat 0.25 lacks it
+│   ├── btop/
+│   │   ├── btop.conf                   # generated defaults + catppuccin_mocha
+│   │   └── themes/catppuccin_mocha.theme
+│   ├── delta/themes/catppuccin.gitconfig  # delta feature for all OSes
+│   ├── eza/theme.yml                   # eza theme (EZA_CONFIG_DIR)
+│   ├── fish/
+│   │   ├── config.fish.tmpl            # single fish config for Ubuntu + macOS
+│   │   └── themes/catppuccin-mocha.theme
 │   ├── gh/config.yml                   # shared gh config (GH_CONFIG_DIR)
 │   ├── git/attributes                  # global Git attributes
 │   ├── lazygit/config.yml              # shared lazygit config (LG_CONFIG_FILE)
+│   ├── opencode/cli.json               # OpenCode Catppuccin theme
 │   ├── ripgrep/config                  # shared rg config (RIPGREP_CONFIG_PATH)
-│   ├── fish/config.fish.tmpl           # single fish config for Ubuntu + macOS
 │   ├── starship.toml                   # catppuccin-powerline preset + uv python_binary
+│   ├── tmux/tmux.conf                  # catppuccin/tmux plugin
 │   ├── zellij/config.kdl.tmpl          # shared; Windows uses ZELLIJ_CONFIG_DIR
 │   ├── nvim/init.lua                   # plugin-free, works offline
 │   ├── yt-dlp/config                   # optional yt-dlp/Deno/archive settings
@@ -511,7 +562,8 @@ and keeps Markdown trailing spaces.
 │   └── Roaming/uv/uv.toml              # TUNA PyPI index for uv (Windows)
 ├── Documents/
 │   ├── PowerShell/
-│   │   └── Microsoft.PowerShell_profile.ps1.tmpl   # PowerShell 7
+│   │   ├── Microsoft.PowerShell_profile.ps1.tmpl   # PowerShell 7
+│   │   └── Modules/Catppuccin/                     # vendored catppuccin/powershell
 │   └── WindowsPowerShell/
 │       └── Microsoft.PowerShell_profile.ps1        # PS 5.1 shim
 ├── run_onchange_before_05-ubuntu-mirror.sh.tmpl       # TUNA apt mirror
@@ -526,7 +578,9 @@ and keeps Markdown trailing spaces.
 ├── run_onchange_after_45-wsl-ssh.sh.tmpl              # WSL2 sshd on port 2222
 ├── run_onchange_after_50-optional-apps.sh.tmpl        # optional macOS apps
 ├── run_onchange_after_50-optional-apps-linux.sh.tmpl  # optional Linux CLI apps
-└── run_onchange_after_50-optional-apps.ps1.tmpl       # optional Windows apps
+├── run_onchange_after_50-optional-apps.ps1.tmpl       # optional Windows apps
+├── run_onchange_after_55-bat-theme.sh.tmpl            # Catppuccin theme for Ubuntu's bat
+└── run_onchange_after_56-tmux-catppuccin.sh.tmpl      # clone the Catppuccin tmux plugin
 ```
 
 ## How the scripts work
@@ -630,15 +684,18 @@ genuinely differ.
 
 ## fish configuration
 
-`dot_config/fish/config.fish.tmpl` is the only managed fish file. It:
+`dot_config/fish/config.fish.tmpl` is the only managed fish config;
+`dot_config/fish/themes/catppuccin-mocha.theme` is the managed theme. It:
 
 - adds `~/.local/bin`, `~/.cargo/bin`, `~/.opencode/bin` and `~/.deno/bin`,
   plus `~/.local/share/fnm` on Linux, to `PATH`;
 - loads Homebrew's `shellenv` on macOS only, disables Homebrew analytics and
   env hints, and points Homebrew at the TUNA API/bottle mirrors;
 - initializes fnm (`fnm env --use-on-cd`) when it is installed;
-- exports `BAT_CONFIG_PATH`, `RIPGREP_CONFIG_PATH`, `GH_CONFIG_DIR`,
-  `LG_CONFIG_FILE` and `DO_NOT_TRACK`;
+- selects the Catppuccin Mocha theme for fish itself and sets the Catppuccin
+  `FZF_DEFAULT_OPTS`;
+- exports `BAT_CONFIG_PATH`, `EZA_CONFIG_DIR`, `RIPGREP_CONFIG_PATH`,
+  `GH_CONFIG_DIR`, `LG_CONFIG_FILE` and `DO_NOT_TRACK`;
 - defines `fd`/`bat` wrappers for Ubuntu's `fdfind`/`batcat` names as a
   fallback for machines that predate the `~/.local/bin` links;
 - defines `mkcd` and `reload`;
@@ -772,12 +829,14 @@ when that matters.
   Neovim, Starship, Zellij and WezTerm use the same managed config files as
   Linux/macOS instead of duplicating them in `%LOCALAPPDATA%`. Zellij ignores
   `XDG_CONFIG_HOME` on Windows, so the profile also sets `ZELLIJ_CONFIG_DIR`.
-- The profile also points `BAT_CONFIG_PATH`, `RIPGREP_CONFIG_PATH`,
-  `GH_CONFIG_DIR` and `LG_CONFIG_FILE` at the shared `~/.config` files, exports
-  `DO_NOT_TRACK` and `POWERSHELL_TELEMETRY_OPTOUT`, hooks direnv when it is
-  installed, and maps Ctrl+R/Ctrl+T to fzf history/file pickers. It forces UTF-8
-  for redirected output and native-command pipelines so PowerShell 5.1 does not
-  write UTF-16 files.
+- The profile also points `BAT_CONFIG_PATH`, `EZA_CONFIG_DIR`,
+  `RIPGREP_CONFIG_PATH`, `GH_CONFIG_DIR` and `LG_CONFIG_FILE` at the shared
+  `~/.config` files, exports `FZF_DEFAULT_OPTS`, `DO_NOT_TRACK` and
+  `POWERSHELL_TELEMETRY_OPTOUT`, imports the vendored Catppuccin module for
+  PSReadLine and `$PSStyle` colors, hooks direnv when it is installed, and maps
+  Ctrl+R/Ctrl+T to fzf history/file pickers. It forces UTF-8 for redirected
+  output and native-command pipelines so PowerShell 5.1 does not write UTF-16
+  files.
 - The profile sets `SHELL` to `pwsh` under PowerShell 7 and to `powershell`
   under Windows PowerShell 5.1, so Zellij panes start in PowerShell instead of
   falling back to `cmd.exe`. The 5.1 shim dot-sources the PS7 profile, and the
@@ -1018,10 +1077,18 @@ chezmoi verify
 - **`ssh` complains about a `ControlPath` socket** — stale multiplexing sockets
   are safe to remove: `rm -f ~/.ssh/control-*`. Multiplexing is only enabled on
   Unix; Windows OpenSSH does not support it.
-- **`bat` says the Catppuccin theme is unknown** — the theme ships with bat
-  0.24+. Ubuntu 26.04, Homebrew and the winget package are new enough; if an
-  older binary is first on `PATH`, upgrade it or remove the `--theme` line from
-  `~/.config/bat/config`.
+- **`bat` says the Catppuccin theme is unknown** — bat 0.26+ bundles it and the
+  Homebrew and winget builds are new enough. Ubuntu 26.04 still packages 0.25.0,
+  so the theme is managed in `~/.config/bat/themes/` there and compiled by
+  `run_onchange_after_55-bat-theme.sh.tmpl`; run `bat cache --build` after
+  deleting `~/.cache/bat`. If an even older binary is first on `PATH`, upgrade
+  it or remove the `--theme` line from `~/.config/bat/config`.
+- **A Catppuccin theme is missing (btop, eza, tmux or OpenCode)** — run
+  `chezmoi apply`. eza reads `EZA_CONFIG_DIR`, OpenCode reads
+  `~/.config/opencode/cli.json` (not `opencode.json`), and tmux needs the
+  plugin cloned by `run_onchange_after_56-tmux-catppuccin.sh.tmpl` (git plus
+  network). btop rewrites `btop.conf` when its settings change, so
+  `chezmoi apply` restores the managed theme and defaults.
 - **`gh`, `lazygit` or `rg` ignores the managed config** — they read
   `GH_CONFIG_DIR`, `LG_CONFIG_FILE` and `RIPGREP_CONFIG_PATH`, which fish and
   the PowerShell profile export. Start a new shell after applying, and check

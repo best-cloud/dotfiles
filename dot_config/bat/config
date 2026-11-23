@@ -4,8 +4,9 @@
 # same file is used on Linux, macOS and Windows (bat reads %APPDATA% by default
 # on Windows, not the XDG directory).
 #
-# "Catppuccin Mocha" ships with bat 0.24+ and matches Windows Terminal,
-# WezTerm, Ghostty, Zellij and the Starship prompt.
+# "Catppuccin Mocha" matches Windows Terminal, WezTerm, Ghostty, Zellij and the
+# Starship prompt. bat 0.26+ bundles it; Ubuntu 26.04 ships 0.25.0, which does
+# not, so Linux also gets the managed theme in ~/.config/bat/themes.
 --theme="Catppuccin Mocha"
 --style=numbers,changes,header
 --italic-text=always

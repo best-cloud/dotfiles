@@ -208,15 +208,18 @@ check_sh_lib "$ROOT/scripts/lib/wsl.sh"
 check_sh_lib "$ROOT/scripts/lib/bootstrap.sh"
 check_ps1 "$ROOT/bootstrap.ps1"
 check_ps1 "$ROOT/Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1"
+check_ps1 "$ROOT/Documents/PowerShell/Modules/Catppuccin/Catppuccin.psm1"
 check_ps1 "$ROOT/scripts/lib/path.ps1"
 check_ps1 "$ROOT/scripts/lib/winget.ps1"
 check_json "$ROOT/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json"
+check_json "$ROOT/dot_config/opencode/cli.json"
 check_lua "$ROOT/dot_config/nvim/init.lua"
 check_lua "$ROOT/dot_config/wezterm/wezterm.lua"
 check_toml "$ROOT/dot_config/starship.toml"
 check_toml "$ROOT/dot_config/uv/uv.toml"
 check_toml "$ROOT/AppData/Roaming/uv/uv.toml"
 check_yaml "$ROOT/dot_config/gh/config.yml"
+check_yaml "$ROOT/dot_config/eza/theme.yml"
 check_yaml "$ROOT/dot_config/lazygit/config.yml"
 check_elisp "$ROOT/dot_spacemacs"
 
@@ -224,6 +227,8 @@ check_elisp "$ROOT/dot_spacemacs"
 if need git; then
     git config --file "$render_dir/dot_gitconfig" --list >/dev/null ||
         fail "git config: $render_dir/dot_gitconfig"
+    git config --file "$ROOT/dot_config/delta/themes/catppuccin.gitconfig" --list >/dev/null ||
+        fail "git config: dot_config/delta/themes/catppuccin.gitconfig"
 fi
 
 # Some templates render empty on this OS. Their single Go template wrapper is
@@ -249,7 +254,7 @@ mkdir -p "$tmp/bodies"
 while IFS= read -r src; do
     rel=${src#"$ROOT"/}
     case "$rel" in
-    *.ps1.tmpl | run_onchange_after_20-macos-defaults.sh.tmpl | run_onchange_after_45-wsl-ssh.sh.tmpl | run_onchange_after_50-optional-apps.sh.tmpl | run_onchange_after_50-optional-apps-linux.sh.tmpl) ;;
+    *.ps1.tmpl | run_onchange_after_20-macos-defaults.sh.tmpl | run_onchange_after_45-wsl-ssh.sh.tmpl | run_onchange_after_50-optional-apps.sh.tmpl | run_onchange_after_50-optional-apps-linux.sh.tmpl | run_onchange_after_55-bat-theme.sh.tmpl | run_onchange_after_56-tmux-catppuccin.sh.tmpl) ;;
     *) continue ;;
     esac
     out="$tmp/bodies/$(printf '%s' "$rel" | sed 's|/|__|g; s|\.tmpl$||')"

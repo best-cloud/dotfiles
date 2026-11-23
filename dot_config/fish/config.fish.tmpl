@@ -9,6 +9,18 @@ fish_add_path --global --move ~/.cargo/bin
 # opencode installs its launcher here.
 fish_add_path --global ~/.opencode/bin
 
+# ---------------------------------------------------------------------------
+# Catppuccin Mocha
+# ---------------------------------------------------------------------------
+# Fish's own colors (syntax highlighting, completions, pager). The theme file is
+# managed in ~/.config/fish/themes; fish 4.4+ also bundles it, but the managed
+# copy keeps older fish (Ubuntu 26.04 ships 4.2) in sync.
+fish_config theme choose catppuccin-mocha
+
+# fzf, with the same colors as the PowerShell profile and the catppuccin/fzf
+# port. FZF_DEFAULT_OPTS keeps this identical on every shell.
+set -gx FZF_DEFAULT_OPTS "--color=bg+:#313244,bg:#1e1e2e,spinner:#f5e0dc,hl:#f38ba8,fg:#cdd6f4,header:#f38ba8,info:#cba6f7,pointer:#f5e0dc,marker:#b4befe,fg+:#cdd6f4,prompt:#cba6f7,hl+:#f38ba8,selected-bg:#45475a,border:#6c7086,label:#cdd6f4"
+
 {{ if eq .chezmoi.os "darwin" -}}
 # Homebrew: /opt/homebrew on Apple Silicon, /usr/local on Intel.
 if test -x /opt/homebrew/bin/brew
@@ -47,9 +59,10 @@ set -gx npm_config_registry https://registry.npmmirror.com/
 # ---------------------------------------------------------------------------
 # Shared configuration paths
 # ---------------------------------------------------------------------------
-# Keep one managed file per tool on all three operating systems. bat, gh and
-# lazygit otherwise switch to a platform-specific directory on Windows/macOS.
+# Keep one managed file per tool on all three operating systems. bat, eza, gh
+# and lazygit otherwise switch to a platform-specific directory on Windows/macOS.
 set -gx BAT_CONFIG_PATH ~/.config/bat/config
+set -gx EZA_CONFIG_DIR ~/.config/eza
 set -gx RIPGREP_CONFIG_PATH ~/.config/ripgrep/config
 set -gx GH_CONFIG_DIR ~/.config/gh
 set -gx LG_CONFIG_FILE ~/.config/lazygit/config.yml

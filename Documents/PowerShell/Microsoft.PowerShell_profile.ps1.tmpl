@@ -75,11 +75,16 @@ $env:EDITOR = 'nvim'
 $env:VISUAL = 'nvim'
 
 # Keep one managed config file per tool on all three operating systems. bat,
-# gh and lazygit otherwise read a platform-specific directory on Windows.
+# gh, eza and lazygit otherwise read a platform-specific directory on Windows.
 $env:BAT_CONFIG_PATH = Join-Path $HOME '.config\bat\config'
+$env:EZA_CONFIG_DIR = Join-Path $HOME '.config\eza'
 $env:RIPGREP_CONFIG_PATH = Join-Path $HOME '.config\ripgrep\config'
 $env:GH_CONFIG_DIR = Join-Path $HOME '.config\gh'
 $env:LG_CONFIG_FILE = Join-Path $HOME '.config\lazygit\config.yml'
+
+# fzf, with the same Catppuccin Mocha colors as dot_config/fish/config.fish.tmpl
+# and the catppuccin/fzf port.
+$env:FZF_DEFAULT_OPTS = '--color=bg+:#313244,bg:#1e1e2e,spinner:#f5e0dc,hl:#f38ba8,fg:#cdd6f4,header:#f38ba8,info:#cba6f7,pointer:#f5e0dc,marker:#b4befe,fg+:#cdd6f4,prompt:#cba6f7,hl+:#f38ba8,selected-bg:#45475a,border:#6c7086,label:#cdd6f4'
 
 # Cross-industry telemetry opt-out plus the PowerShell-specific switch.
 $env:DO_NOT_TRACK = '1'
@@ -198,6 +203,73 @@ if (Get-Module -ListAvailable PSReadLine) {
                 [Microsoft.PowerShell.PSConsoleReadLine]::Insert($selection)
             }
         }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Catppuccin Mocha
+# ---------------------------------------------------------------------------
+# The palette comes from the vendored catppuccin/powershell module (see
+# Documents/PowerShell/Modules/Catppuccin). Import it by path: the Windows
+# PowerShell 5.1 shim dot-sources this file too, and 5.1's PSModulePath does
+# not include the PowerShell 7 user module directory.
+$catppuccinManifest = Join-Path $HOME 'Documents\PowerShell\Modules\Catppuccin\Catppuccin.psd1'
+if (Test-Path -LiteralPath $catppuccinManifest) {
+    Import-Module $catppuccinManifest -ErrorAction SilentlyContinue
+}
+if (Get-Variable -Name Catppuccin -Scope Global -ErrorAction SilentlyContinue) {
+    $CatppuccinMocha = $Catppuccin['Mocha']
+
+    # PSReadLine syntax and prediction colors, matching fish and bat. Older
+    # PSReadLine versions (the one in Windows PowerShell 5.1) do not know the
+    # prediction keys, and one unknown key fails the whole call, so only pass
+    # the keys that version exposes.
+    if (Get-Command Set-PSReadLineOption -ErrorAction SilentlyContinue) {
+        $readLineColors = @{
+            ContinuationPrompt     = $CatppuccinMocha.Teal.Foreground()
+            Emphasis               = $CatppuccinMocha.Red.Foreground()
+            Selection              = $CatppuccinMocha.Surface0.Background()
+            InlinePrediction       = $CatppuccinMocha.Overlay0.Foreground()
+            ListPrediction         = $CatppuccinMocha.Mauve.Foreground()
+            ListPredictionSelected = $CatppuccinMocha.Surface0.Background()
+            Command                = $CatppuccinMocha.Blue.Foreground()
+            Comment                = $CatppuccinMocha.Overlay0.Foreground()
+            Default                = $CatppuccinMocha.Text.Foreground()
+            Error                  = $CatppuccinMocha.Red.Foreground()
+            Keyword                = $CatppuccinMocha.Mauve.Foreground()
+            Member                 = $CatppuccinMocha.Rosewater.Foreground()
+            Number                 = $CatppuccinMocha.Peach.Foreground()
+            Operator               = $CatppuccinMocha.Sky.Foreground()
+            Parameter              = $CatppuccinMocha.Pink.Foreground()
+            String                 = $CatppuccinMocha.Green.Foreground()
+            Type                   = $CatppuccinMocha.Yellow.Foreground()
+            Variable               = $CatppuccinMocha.Lavender.Foreground()
+        }
+        $supportedColors = @{}
+        $availableColors = (Get-PSReadLineOption).PSObject.Properties.Name
+        foreach ($name in $readLineColors.Keys) {
+            if ($availableColors -contains "${name}Color") {
+                $supportedColors[$name] = $readLineColors[$name]
+            }
+        }
+        if ($supportedColors.Count -gt 0) {
+            try {
+                Set-PSReadLineOption -Colors $supportedColors
+            } catch {
+                # Leave PSReadLine's colors alone if the call still fails.
+            }
+        }
+    }
+
+    # PowerShell's own formatting colors, available from 7.2.
+    if ($PSVersionTable.PSVersion -ge [version]'7.2') {
+        $PSStyle.Formatting.Debug = $CatppuccinMocha.Sky.Foreground()
+        $PSStyle.Formatting.Error = $CatppuccinMocha.Red.Foreground()
+        $PSStyle.Formatting.ErrorAccent = $CatppuccinMocha.Blue.Foreground()
+        $PSStyle.Formatting.FormatAccent = $CatppuccinMocha.Teal.Foreground()
+        $PSStyle.Formatting.TableHeader = $CatppuccinMocha.Rosewater.Foreground()
+        $PSStyle.Formatting.Verbose = $CatppuccinMocha.Yellow.Foreground()
+        $PSStyle.Formatting.Warning = $CatppuccinMocha.Peach.Foreground()
     }
 }
 

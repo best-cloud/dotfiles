@@ -31,11 +31,16 @@
     # Colorize only, so `git add -p` still sees and edits the raw hunk text.
     diffFilter = delta --color-only || cat
 
+# Catppuccin Mocha for delta. The include is the upstream catppuccin/delta port
+# (managed for every OS); the feature also sets syntax-theme = Catppuccin Mocha.
+[include]
+    path = ~/.config/delta/themes/catppuccin.gitconfig
+
 [delta]
     navigate = true
     line-numbers = true
     hyperlinks = true
-    syntax-theme = Catppuccin Mocha
+    features = catppuccin-mocha
 
 [diff]
     algorithm = histogram

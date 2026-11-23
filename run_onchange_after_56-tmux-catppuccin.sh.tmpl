@@ -1,0 +1,32 @@
+{{ if ne .chezmoi.os "windows" -}}
+#!/bin/sh
+# Clone the Catppuccin tmux plugin on the first apply.
+#
+# tmux is packaged by every supported Unix, but its Catppuccin port is not, so
+# the managed ~/.config/tmux/tmux.conf sources it from this fixed path. The tag
+# is the release the managed config is written against; an existing checkout is
+# left alone (tmux plugins do not self-update).
+set -eu
+
+# WSL appends the Windows PATH; a /mnt git.exe would create a Windows checkout,
+# so require the native git.
+{{ include "scripts/lib/shell.sh" }}
+if ! native_cmd git; then
+    echo "warning: git is not installed; skipping the Catppuccin tmux clone" >&2
+    exit 0
+fi
+
+target="$HOME/.config/tmux/plugins/catppuccin/tmux"
+if [ -d "$target/.git" ]; then
+    exit 0
+fi
+if [ -e "$target" ]; then
+    echo "warning: $target exists but is not a git checkout; leaving it alone" >&2
+    exit 0
+fi
+
+echo "==> cloning catppuccin/tmux (v2.3.2) into $target"
+mkdir -p "$(dirname "$target")"
+git clone --branch v2.3.2 --depth 1 \
+    https://github.com/catppuccin/tmux.git "$target"
+{{ end -}}

@@ -26,11 +26,21 @@ Documents/**
 .config/ghostty/**
 {{ end -}}
 
+# Linux-only targets. Ubuntu 26.04 packages bat 0.25.0, which predates the
+# Catppuccin themes that dot_config/bat/config selects; the theme is shipped and
+# compiled into bat's cache there. bat 0.26+ on macOS and Windows has it built in.
+{{ if ne .chezmoi.os "linux" -}}
+.config/bat/themes/**
+{{ end -}}
+
 # Unix-only targets. Neovim and Zellij are kept because the Windows profile
 # sets XDG_CONFIG_HOME (and ZELLIJ_CONFIG_DIR), so they read ~/.config on
 # Windows as well. uv does not: it reads %APPDATA%\uv\uv.toml on Windows, which
-# is managed as AppData/Roaming/uv/uv.toml instead.
+# is managed as AppData/Roaming/uv/uv.toml instead. btop and tmux are not
+# installed on Windows.
 {{ if eq .chezmoi.os "windows" -}}
+.config/btop/**
 .config/fish/**
+.config/tmux/**
 .config/uv/**
 {{ end -}}
