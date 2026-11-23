@@ -790,10 +790,10 @@ when that matters.
 - Windows Terminal is the default Windows client and opens PowerShell 7; its
   managed settings live under
   `%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState`.
-  It copies on select, strips formatting, trims pasted whitespace, uses compact
-  tabs and a 1.5 cell height (manually tuned; WezTerm keeps its own 1.1 line
-  height). WezTerm stays installed for WSL-only sessions and opens WSL2
-  directly.
+  It copies on select, strips formatting, trims pasted whitespace, keeps the
+  default equal-width tabs and uses a 1.5 cell height (manually tuned; WezTerm
+  keeps its own 1.1 line height). WezTerm stays installed for WSL-only sessions
+  and opens WSL2 directly.
 - `run_onchange_after_35-windows-ssh.ps1.tmpl` enables the built-in Windows
   OpenSSH Server on port 22: it installs the `OpenSSH.Server` capability, sets
   the `sshd` service to Automatic and starts it, adds a `Windows SSH (TCP 22)`
