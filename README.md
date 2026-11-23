@@ -84,10 +84,12 @@ On WSL2, `bootstrap.sh` also enables systemd by merging `systemd=true` into the
 `[boot]` section of `/etc/wsl.conf`; the rest of the file (`[automount]`,
 `[interop]`, `[user]`, …) is preserved and the edit is skipped when it is already
 correct. WSL reads this file only when the distribution starts, so run
-`wsl --shutdown` from Windows and reopen Ubuntu afterwards. If Ollama was
-installed during the same bootstrap, enable its service after the restart with
-`sudo systemctl enable --now ollama` (the installer writes the unit but cannot
-enable it while systemd is not running).
+`wsl --shutdown` from Windows and reopen Ubuntu afterwards. The first WSL
+bootstrap has no systemd, so it defers `openssh-server`; reopen WSL and run
+`chezmoi apply` once more to install it and apply the SSH port configuration.
+If Ollama was installed during the same bootstrap, enable its service after the
+restart with `sudo systemctl enable --now ollama` (the installer writes the
+unit but cannot enable it while systemd is not running).
 
 ### Repository URL
 
@@ -105,7 +107,7 @@ GitHub (SSH key or `gh auth login`), or pass an SSH URL through
 | | Ubuntu / WSL2 (apt) | macOS (Homebrew) | Windows 11 (winget) |
 |---|---|---|---|
 | Shell / prompt | fish, starship | fish, starship | PowerShell 7, Starship |
-| Core CLI | git, git-lfs, curl, wget, build-essential, unzip, zip, bsdextrautils (col) | git, git-lfs, wget | Git, Git LFS |
+| Core CLI | git, git-lfs, curl, wget, build-essential, unzip, zip, zstd, bsdextrautils (col) | git, git-lfs, wget | Git, Git LFS |
 | Modern CLI | ripgrep, fd-find, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq, tree, htop, btop, tmux | ripgrep, fd, bat, eza, fzf, zoxide, jq |
 | Editors / multiplexers | neovim, emacs, zellij | neovim, emacs, zellij | Neovim, Emacs, Zellij |
 | Dev tools | gh, direnv, uv, AWS CLI, AWS CDK, lazygit, delta, mosh | gh, direnv, uv, AWS CLI, AWS CDK, lazygit, delta, mosh, WeChat DevTools, Postman | gh, direnv, uv, AWS CLI, AWS CDK, lazygit, delta, WeChat DevTools, Postman (mosh via WSL) |
@@ -115,7 +117,7 @@ GitHub (SSH key or `gh auth login`), or pass an SSH URL through
 | Formatters / linters | prettier, shfmt, shellcheck | prettier, shfmt, shellcheck | Prettier, shfmt, ShellCheck |
 | Optional daily-use apps | see below (CLI tools) | see below | see below |
 | Terminal | — (client terminal) | Ghostty | Windows Terminal, WezTerm |
-| Remote access | openssh-server (Ubuntu Server 22, WSL 2222), mosh, wslu (WSL only) | mosh | Windows OpenSSH Server (22), firewall for 22 + WSL 2222/mosh |
+| Remote access | openssh-server (Ubuntu Server 22, WSL 2222), mosh | mosh | Windows OpenSSH Server (22), firewall for 22 + WSL 2222/mosh |
 | WSL2 / Ubuntu | — (native) | — | Microsoft.WSL + latest Ubuntu LTS |
 | Terminal font | — (client terminal) | JetBrainsMono Nerd Font | JetBrainsMono Nerd Font |
 | Editor config | Spacemacs in `~/.emacs.d` | Spacemacs in `~/.emacs.d` | Spacemacs in `%USERPROFILE%\.emacs.d` |
@@ -135,11 +137,14 @@ config still works without them (`core.pager` falls back to `less`). apt
 installs are retried one package at a time when a batch fails, so one
 unavailable package does not block the rest of the list.
 
-`wslu` is a WSL-only package: it provides `wslview`, which fish exports as
-`BROWSER` so `gh auth login`, AWS SSO and `open`-style tools open links in the
-Windows browser instead of failing. Ubuntu Server does not need it, and macOS
-and Windows have their own URL handlers, so it is the one conditional package
-in the Linux list.
+`zstd` is in the Linux package list because the upstream Ollama installer uses
+it for extraction; without it the installer prints an error and Ollama is left
+uninstalled. macOS's Ollama formula handles this itself.
+
+`wslu`/`wslview` is not packaged by Ubuntu 26.04, so the Linux script does not
+try to install it. If you install `wslu` manually, fish detects `wslview` and
+sets `BROWSER`, so `gh auth login`, AWS SSO and `open`-style tools open links in
+the Windows browser. macOS and Windows have their own URL handlers.
 
 `fd` and `bat` are installed from Ubuntu's `fd-find` and `bat` packages, whose
 binaries are named `fdfind` and `batcat`. The Linux script links them into
@@ -181,10 +186,11 @@ after fnm has installed Node.js; both prefixes are on `PATH`.
 Ubuntu packages `mosh` but not `ollama` (it ships only the `python3-ollama`
 client library), so the Linux script installs Ollama with the upstream installer
 at <https://ollama.com/install.sh>. That installer needs root, so it runs through
-`sudo` when the script is not already root. In WSL without systemd the binary is
-still installed; start the server with `ollama serve`. macOS gets both from
-Homebrew (`mosh` and `ollama` formulae). Windows deliberately does not install
-Ollama natively; use `ollama` from the WSL2 Ubuntu distribution instead.
+`sudo` when the script is not already root, and it needs `zstd`, which is in the
+apt list. In WSL without systemd the binary is still installed; start the server
+with `ollama serve`. macOS gets both from Homebrew (`mosh` and `ollama`
+formulae). Windows deliberately does not install Ollama natively; use `ollama`
+from the WSL2 Ubuntu distribution instead.
 
 mosh is installed on both Ubuntu Server and WSL (the same apt package), and on
 macOS. It has no native Windows build or winget package, so on Windows it is
@@ -209,18 +215,19 @@ the Windows host with:
 ssh <windows-user>@<windows-lan-ip>
 ```
 
-WSL2 Ubuntu separately serves SSH on **port 2222**. The Linux
-package list includes `openssh-server` (Ubuntu Server images already have it),
-and `run_onchange_after_45-wsl-ssh.sh.tmpl` writes
+WSL2 Ubuntu separately serves SSH on **port 2222**. The Linux package list
+includes `openssh-server` for Ubuntu Server. On WSL the first boot has no
+systemd, so the hash-gated package script defers `openssh-server` and removes a
+half-configured copy; `run_after_45-wsl-ssh.sh.tmpl` retries the install
+after `wsl --shutdown` starts systemd, then writes
 `/etc/ssh/sshd_config.d/00-chezmoi-wsl.conf` with `Port 2222`. Ubuntu 26.04+
 starts SSH from `ssh.socket`, so the script also writes
 `/etc/systemd/system/ssh.socket.d/zz-chezmoi-port.conf` and restarts
 `ssh.socket` (the `zz-` prefix keeps the override after systemd's generated
 `addresses.conf`). This targets Ubuntu 26.04+ and assumes systemd socket
-activation; if systemd is not running yet, the script writes both files and
-asks for `wsl --shutdown`. The script is a no-op on Ubuntu Server, so a server
-keeps its normal SSH port. Port 2222 avoids colliding with the Windows OpenSSH
-server, which normally owns port 22.
+activation. The script is a no-op on Ubuntu Server, so a server keeps its normal
+SSH port. Port 2222 avoids colliding with the Windows OpenSSH server, which
+normally owns port 22.
 
 On the Windows side, `dot_wslconfig` sets `networkingMode=mirrored` so WSL2
 shares the Windows host's network interfaces. WSL only reads `.wslconfig` when
@@ -248,7 +255,7 @@ Windows and WSL2 can be reached at the same LAN address because they listen on
 different ports. mosh uses the WSL SSH connection on port 2222 and then switches
 to its UDP port. Keep Windows on 22 and WSL on 2222; if one side is moved,
 update `run_onchange_after_35-windows-ssh.ps1.tmpl`,
-`run_onchange_after_45-wsl-ssh.sh.tmpl` and the firewall rules together.
+`run_after_45-wsl-ssh.sh.tmpl` and the firewall rules together.
 
 Ubuntu 26.04 packages Starship 1.22.1, but the shipped
 `catppuccin-powerline` preset uses `jj_bookmark`, added in Starship 1.27.0.
@@ -510,7 +517,7 @@ and keeps Markdown trailing spaces.
 ├── run_onchange_after_30-spacemacs.ps1.tmpl           # clone Spacemacs (Windows)
 ├── run_onchange_after_35-windows-ssh.ps1.tmpl         # Windows OpenSSH on 22, pwsh 7
 ├── run_onchange_after_40-wsl.ps1.tmpl                 # WSL2 + Ubuntu + firewall
-├── run_onchange_after_45-wsl-ssh.sh.tmpl              # WSL2 sshd on port 2222
+├── run_after_45-wsl-ssh.sh.tmpl                # WSL2 sshd on port 2222 (retries openssh)
 ├── run_onchange_after_50-optional-apps.sh.tmpl        # optional macOS apps
 ├── run_onchange_after_50-optional-apps-linux.sh.tmpl  # optional Linux CLI apps
 └── run_onchange_after_50-optional-apps.ps1.tmpl       # optional Windows apps
@@ -521,7 +528,9 @@ and keeps Markdown trailing spaces.
 The installers are `run_onchange_` scripts: chezmoi hashes the rendered content
 and re-runs a script only when it changes. Add a package to a list, run
 `chezmoi apply`, and it installs just that package (all scripts are
-idempotent).
+idempotent). The WSL SSH script uses `run_` (always) instead, because the first
+WSL boot cannot configure `openssh-server` before systemd exists and a later
+`chezmoi apply` must retry it.
 
 Individual downloads stay best-effort so one failure does not block the rest of
 the list. The tools with no distro package (Node.js from fnm, prettier, AWS CDK)
@@ -1050,11 +1059,20 @@ chezmoi verify
   2222` should show the listener, and `systemctl status ssh.socket` should be
   active. The mosh UDP range 60000-61000 must not be blocked by a network
   firewall between the client and Windows.
+- **WSL apt reports a half-configured `openssh-server`** — the first WSL boot
+  runs before systemd, so the package script defers `openssh-server` rather
+  than leaving dpkg broken. Run `wsl --shutdown` from Windows, reopen Ubuntu,
+  and run `chezmoi apply` again; `run_after_45-wsl-ssh.sh.tmpl` installs
+  it and configures port 2222. If apt reports a half-configured package from an
+  older run, the next applied package script removes it and the always-run SSH
+  script reinstalls it after systemd starts. If removal is refused, run
+  `sudo dpkg --remove --force-remove-reinstreq openssh-server` manually, then
+  `wsl --shutdown` and re-apply.
 - **WSL sshd fails with `Address already in use`** — another WSL distribution,
   a leftover `sshd`, or a manually re-ported Windows sshd already holds port
   2222. Check with `Get-NetTCPConnection -LocalPort 2222 -State Listen` in
   PowerShell, then move the other listener or change the WSL port in
-  `run_onchange_after_45-wsl-ssh.sh.tmpl` and the firewall rules.
+  `run_after_45-wsl-ssh.sh.tmpl` and the firewall rules.
 - **Spacemacs did not clone** — check `chezmoi apply` output. A pre-existing
   `~/.emacs.d` that is not a git checkout is intentionally left alone, and the
   clone needs git plus network access. An existing checkout on another branch

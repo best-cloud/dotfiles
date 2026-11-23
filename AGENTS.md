@@ -49,7 +49,9 @@ behavior; this file only records what agents otherwise get wrong.
   stay in sync. Do **not** add `.editorconfig` to `.chezmoiignore`: patterns
   match target paths, so it would also ignore the managed `~/.editorconfig`.
 - Scripts run in lexical order (`10-`, `20-` prefixes); `before_`/`after_` choose
-  the apply phase.
+  the apply phase. Use `run_` (always) only for a convergence step that must
+  retry on a later apply, such as installing `openssh-server` after WSL starts
+  systemd; everything else stays `run_onchange_`.
 - Any rendered byte change in a `run_onchange_` script (even a comment) makes
   chezmoi re-run it on the next apply. Don't edit them casually on a live box.
 - A `run_onchange_` script that exits 0 is recorded as done even when a
@@ -76,9 +78,10 @@ behavior; this file only records what agents otherwise get wrong.
   caveats for pre-26.04 Ubuntu or older Windows 11 releases; systemd socket
   activation, mirrored WSL networking and the Hyper-V firewall are part of the
   baseline.
-- Each `run_onchange_` script is wrapped in `{{ if eq .chezmoi.os "..." }}` and
-  must render to whitespace on other OSes; chezmoi skips whitespace-only
-  scripts. Existing files use `-}}` trims so they render completely empty.
+- Each `run_onchange_`/`run_` script is wrapped in
+  `{{ if eq .chezmoi.os "..." }}` and must render to whitespace on other OSes;
+  chezmoi skips whitespace-only scripts. Existing files use `-}}` trims so they
+  render completely empty.
 - The same tool must stay in sync across three lists: apt (linux branch of
   `...install-packages.sh.tmpl`), Homebrew formulas/casks (darwin branch), and
   winget IDs (`...install-packages.ps1.tmpl`). Tools apt may not package need a
@@ -97,12 +100,15 @@ behavior; this file only records what agents otherwise get wrong.
   managed fish `MANPAGER` pipeline uses. macOS ships `col` with the base system
   and fish is not managed on Windows, so it has no Homebrew or winget entry.
   `openssh-server` is the other Linux-only package: it provides the WSL2 sshd,
-  which `run_onchange_after_45-wsl-ssh.sh.tmpl` moves to port 2222. The script
-  exits on non-WSL kernels, so Ubuntu Server keeps port 22; macOS and Windows
-  provide their own SSH servers and need no package entry.
-  `wslu` is the conditional exception: it is added to the Linux `PACKAGES`
-  string behind `{{ if .isWSL }}` because it provides `wslview` for `BROWSER`
-  only inside WSL2. It has no Homebrew or winget counterpart.
+  which `run_after_45-wsl-ssh.sh.tmpl` installs after systemd exists and
+  moves to port 2222. The script exits on non-WSL kernels, so Ubuntu Server
+  keeps port 22; macOS and Windows provide their own SSH servers and need no
+  package entry. The first WSL apply has no systemd, so the hash-gated package
+  script removes a half-configured `openssh-server` and skips it rather than
+  leaving dpkg broken; the always-run script retries after `wsl --shutdown`.
+  `zstd` is Linux-only too: the upstream Ollama installer needs it for
+  extraction. `wslu`/`wslview` is not packaged by Ubuntu 26.04; do not add it to
+  `PACKAGES`, and keep fish's `BROWSER=wslview` guard for manual installs.
   `git-lfs` (`git-lfs` on apt/Homebrew, `GitHub.GitLFS` on winget) and
   `git-delta` (`git-delta` on apt/Homebrew, `dandavison.delta` on winget) are
   mandatory in all three lists. The LFS clean/smudge/process filters live in
@@ -307,24 +313,28 @@ behavior; this file only records what agents otherwise get wrong.
   remove the elevated-shell warning, and keep the
   `{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}` WSL VMCreatorId.
 - WSL2 Ubuntu listens on SSH port 2222 so it does not collide with the Windows
-  OpenSSH server on 22. `run_onchange_after_45-wsl-ssh.sh.tmpl` writes
+  OpenSSH server on 22. `run_after_45-wsl-ssh.sh.tmpl` installs
+  `openssh-server` (deferred until systemd is running) and writes
   `/etc/ssh/sshd_config.d/00-chezmoi-wsl.conf` and
   `/etc/systemd/system/ssh.socket.d/zz-chezmoi-port.conf`. The repo targets
   Ubuntu 26.04+, which starts SSH from `ssh.socket`; do not add an
   `ssh.service` or init-script fallback. Changing only `sshd_config` leaves the
   listener on 22, so the `zz-` drop-in must sort after the generator's
   `addresses.conf`, reset `ListenStream=` and set both `0.0.0.0:2222` and
-  `[::]:2222`. The script enables and restarts `ssh.socket`; when systemd is not
-  running yet it only writes the files and asks for `wsl --shutdown`. OpenSSH
-  `Port` options are cumulative, not first-wins, so the script warns when
-  `sshd -T` reports any port other than 2222. Keep the runtime `/proc/version`
-  check so Ubuntu Server is untouched, and keep the firewall port in sync with
-  these drop-ins. Mosh reuses the SSH connection and then uses UDP 60000-61000.
+  `[::]:2222`. The script enables and restarts `ssh.socket`. Because this is a
+  `run_` (always) script, a first WSL boot without systemd defers the package
+  and a later `chezmoi apply` installs and configures it. OpenSSH `Port` options
+  are cumulative, not first-wins, so the script warns when `sshd -T` reports any
+  port other than 2222. Keep the runtime `/proc/version` check so Ubuntu Server
+  is untouched, and keep the firewall port in sync with these drop-ins. Mosh
+  reuses the SSH connection and then uses UDP 60000-61000.
 - On WSL, `bootstrap.sh` idempotently merges `systemd=true` into a `[boot]`
   section of `/etc/wsl.conf` (detected via `/proc/version`) and never overwrites
   the rest of the file. WSL only reads it at distro start, so the restart with
   `wsl --shutdown` is required; the bootstrap itself still runs without systemd.
-  Ollama's installer writes the unit but cannot enable it until that restart.
+  The first apply defers `openssh-server`, so run `chezmoi apply` once after the
+  restart to install it and configure port 2222. Ollama's installer writes the
+  unit but cannot enable it until that restart.
 - WSL appends the Windows `PATH`, which includes `/mnt/c/...`. Never use a bare
   `command -v` to decide whether a Linux tool is installed: when the native
   binary is missing, the probe falls through to a Windows shim (the Windows npm

@@ -35,10 +35,9 @@ STARSHIP_MIN_VERSION=1.27.0
 # with apt-cache below and installed by their upstream installer if missing.
 # bsdextrautils provides col, which fish's MANPAGER pipeline uses to strip
 # overstrike codes before bat renders a man page. openssh-server provides the
-# WSL2 sshd (configured on port 2222 by run_onchange_after_45-wsl-ssh.sh.tmpl);
-# it is Linux-only because macOS and Windows have their own SSH servers. wslu
-# provides wslview so BROWSER opens URLs in the Windows browser; it only exists
-# in the WSL2 distribution.
+# WSL2 sshd (configured on port 2222 by run_after_45-wsl-ssh.sh.tmpl);
+# it is Linux-only because macOS and Windows have their own SSH servers. zstd
+# is required by the upstream Ollama installer.
 PACKAGES="
 ca-certificates
 curl
@@ -48,6 +47,7 @@ git-lfs
 build-essential
 unzip
 zip
+zstd
 fish
 ripgrep
 fd-find
@@ -81,8 +81,26 @@ fnm
 prettier
 shfmt
 shellcheck
-{{ if .isWSL }}wslu{{ end }}
 "
+
+# WSL starts without systemd on the first bootstrap. openssh-server's postinst
+# calls systemctl, which fails there and leaves dpkg unable to configure any
+# later package. Defer it to run_after_45-wsl-ssh.sh.tmpl, which runs
+# after `wsl --shutdown` starts systemd; remove a half-configured package now
+# so the rest of this apt transaction still succeeds.
+if grep -qi microsoft /proc/version 2>/dev/null && [ ! -d /run/systemd/system ]; then
+    PACKAGES=$(printf '%s\n' "$PACKAGES" | grep -vx openssh-server)
+    if dpkg -s openssh-server >/dev/null 2>&1; then
+        status=$(dpkg -s openssh-server 2>/dev/null | awk -F': ' '$1 == "Status" { print $2 }')
+        case "$status" in
+        *unpacked* | *half-configured* | *half-installed*)
+            echo "==> removing half-configured openssh-server until WSL restarts with systemd" >&2
+            as_root dpkg --remove --force-remove-reinstreq openssh-server ||
+                echo "warning: could not remove the half-configured openssh-server" >&2
+            ;;
+        esac
+    fi
+fi
 
 echo "==> apt-get update"
 # A mirror hiccup should not abort the whole bootstrap while usable package
