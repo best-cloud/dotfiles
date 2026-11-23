@@ -55,7 +55,9 @@ This function should only modify configuration layer settings."
      (python :variables python-formatter 'ruff
              python-format-on-save t)
      shell-scripts
+     toml
      typescript
+     windows-scripts
      yaml)
 
 

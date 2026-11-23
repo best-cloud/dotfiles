@@ -904,8 +904,8 @@ The enabled layers cover editing and navigation (`auto-completion`,
 `better-defaults`, `git`, `helm`, `multiple-cursors`, `syntax-checking`,
 `treemacs`, `version-control`) and the common languages `python`, `javascript`,
 `typescript`, `html` (which also handles CSS/SCSS/Less), `yaml`, `json`,
-`markdown`, `org` and `shell-scripts`. Python is the only language that formats
-on save:
+`markdown`, `org`, `shell-scripts`, `toml` and `windows-scripts` (batch files
+and PowerShell). Python is the only language that formats on save:
 
 - `syntax-checking` runs Flycheck, which prefers its built-in `python-ruff`
   checker when `ruff` is on `PATH` (Flycheck 39+).
