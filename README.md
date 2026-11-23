@@ -84,13 +84,14 @@ On WSL2, `bootstrap.sh` also enables systemd by merging `systemd=true` into the
 `[boot]` section of `/etc/wsl.conf`; the rest of the file (`[automount]`,
 `[interop]`, `[user]`, …) is preserved and the edit is skipped when it is already
 correct. WSL reads this file only when the distribution starts, so run
-`wsl --shutdown` from Windows and reopen Ubuntu afterwards. The first WSL apply
-has no systemd, so its apt phase uses a temporary no-op `systemctl` to let
-packages such as `openssh-server` finish configuring; the socket and service
-drop-ins take effect after the restart. If Ollama was installed during the same
-bootstrap, enable its service after the restart with
-`sudo systemctl enable --now ollama` (the installer writes the unit but cannot
-enable it while systemd is not running).
+`wsl --shutdown` from Windows and reopen Ubuntu afterwards. Until that restart
+WSL may still run without systemd, so the first apt phase uses a temporary no-op
+`systemctl` and a temporary `policy-rc.d` (exit 101) so packages such as
+`openssh-server` finish configuring without starting services on ports the
+Windows host already owns; the socket and service drop-ins take effect after the
+restart. If Ollama was installed during the same bootstrap, enable its service
+after the restart with `sudo systemctl enable --now ollama` (the installer
+writes the unit but cannot enable it while systemd is not running).
 
 ### Repository URL
 
@@ -217,10 +218,13 @@ ssh <windows-user>@<windows-lan-ip>
 ```
 
 WSL2 Ubuntu separately serves SSH on **port 2222**. The Linux package list
-includes `openssh-server`. On WSL the first boot has no systemd, so the package
-script prepends a temporary no-op `systemctl` to `PATH` while apt runs; that
-lets `openssh-server` finish configuring instead of leaving dpkg broken.
-`run_onchange_after_45-wsl-ssh.sh.tmpl` writes
+includes `openssh-server`. Mirrored networking shares the Windows host's ports,
+so the Windows OpenSSH server owns 22 and `openssh-server`'s postinst cannot
+start `ssh.socket` there. While `openssh-server` is not configured yet, the
+package script runs apt with a temporary `/usr/sbin/policy-rc.d` that returns
+101 (`invoke-rc.d` and `deb-systemd-invoke` both honor it), and repairs a
+half-configured package from an earlier run with `dpkg --configure -a` before
+installing anything. `run_onchange_after_45-wsl-ssh.sh.tmpl` then writes
 `/etc/ssh/sshd_config.d/00-chezmoi-wsl.conf` with `Port 2222` and ensures the
 socket is enabled for the next boot. Ubuntu 26.04+
 starts SSH from `ssh.socket`, so the script also writes
@@ -519,7 +523,7 @@ and keeps Markdown trailing spaces.
 ├── run_onchange_after_30-spacemacs.ps1.tmpl           # clone Spacemacs (Windows)
 ├── run_onchange_after_35-windows-ssh.ps1.tmpl         # Windows OpenSSH on 22, pwsh 7
 ├── run_onchange_after_40-wsl.ps1.tmpl                 # WSL2 + Ubuntu + firewall
-├── run_onchange_after_45-wsl-ssh.sh.tmpl                # WSL2 sshd on port 2222 (retries openssh)
+├── run_onchange_after_45-wsl-ssh.sh.tmpl              # WSL2 sshd on port 2222
 ├── run_onchange_after_50-optional-apps.sh.tmpl        # optional macOS apps
 ├── run_onchange_after_50-optional-apps-linux.sh.tmpl  # optional Linux CLI apps
 └── run_onchange_after_50-optional-apps.ps1.tmpl       # optional Windows apps
@@ -1059,12 +1063,16 @@ chezmoi verify
   2222` should show the listener, and `systemctl status ssh.socket` should be
   active. The mosh UDP range 60000-61000 must not be blocked by a network
   firewall between the client and Windows.
-- **WSL apt reports a half-configured `openssh-server`** — the first WSL boot
-  has no systemd, so the package script runs apt with a temporary no-op
-  `systemctl`; this lets the postinst finish instead of leaving dpkg broken.
-  For an older half-configured state, run `wsl --shutdown` from Windows,
-  reopen Ubuntu, then `sudo dpkg --configure -a` (or
-  `sudo apt-get install -f`) and `chezmoi apply`. The SSH socket takes effect
+- **WSL apt reports a half-configured `openssh-server`** — mirrored networking
+  means the Windows OpenSSH server owns port 22, so `openssh-server`'s postinst
+  cannot start `ssh.socket` there and leaves dpkg half-configured; every later
+  apt transaction then fails. The package script detects this, runs apt with a
+  temporary `policy-rc.d` (exit 101) and repairs dpkg with `dpkg --configure -a`
+  before installing, so `chezmoi update && chezmoi apply` converges. To repair
+  by hand, install the same guard with
+  `sudo sh -c 'printf "#!/bin/sh\nexit 101\n" > /usr/sbin/policy-rc.d'` and
+  `sudo chmod 755 /usr/sbin/policy-rc.d`, run `sudo dpkg --configure -a`, then
+  remove `/usr/sbin/policy-rc.d` and re-apply. The SSH socket takes effect
   after the restart.
 - **WSL sshd fails with `Address already in use`** — another WSL distribution,
   a leftover `sshd`, or a manually re-ported Windows sshd already holds port

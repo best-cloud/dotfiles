@@ -35,7 +35,7 @@ STARSHIP_MIN_VERSION=1.27.0
 # with apt-cache below and installed by their upstream installer if missing.
 # bsdextrautils provides col, which fish's MANPAGER pipeline uses to strip
 # overstrike codes before bat renders a man page. openssh-server provides the
-# WSL2 sshd (configured on port 2222 by run_after_45-wsl-ssh.sh.tmpl);
+# WSL2 sshd (configured on port 2222 by run_onchange_after_45-wsl-ssh.sh.tmpl);
 # it is Linux-only because macOS and Windows have their own SSH servers. zstd
 # is required by the upstream Ollama installer.
 PACKAGES="
@@ -88,19 +88,66 @@ shellcheck
 # every later apt transaction then fails too. A no-op systemctl lets dpkg
 # configure openssh-server; its ssh.socket drop-ins take effect after
 # `wsl --shutdown` starts systemd.
+is_wsl=0
+if grep -qi microsoft /proc/version 2>/dev/null; then
+    is_wsl=1
+fi
+openssh_configured() {
+    dpkg-query -W -f '${Status}' openssh-server 2>/dev/null |
+        grep -q '^install ok installed$'
+}
 fake_systemd_bin=""
-cleanup_fake_systemd() {
+policy_rc_d=0
+cleanup_local_state() {
     if [ -n "$fake_systemd_bin" ]; then
         rm -rf "$fake_systemd_bin"
     fi
+    if [ "$policy_rc_d" -eq 1 ]; then
+        as_root rm -f /usr/sbin/policy-rc.d
+    fi
 }
-trap cleanup_fake_systemd EXIT
-if grep -qi microsoft /proc/version 2>/dev/null && [ ! -d /run/systemd/system ]; then
+trap cleanup_local_state EXIT
+if [ "$is_wsl" -eq 1 ] && [ ! -d /run/systemd/system ]; then
     fake_systemd_bin=$(mktemp -d)
     printf '#!/bin/sh\nexit 0\n' >"$fake_systemd_bin/systemctl"
     chmod +x "$fake_systemd_bin/systemctl"
     PATH="$fake_systemd_bin:$PATH"
     export PATH
+fi
+
+# Mirrored WSL networking shares the Windows host's ports, so the Windows
+# OpenSSH server owns 22. Until the 2222 drop-in exists, openssh-server's
+# postinst restarts ssh.socket on 22, the bind fails with "Address already in
+# use", and dpkg is left half-configured, which breaks every later apt
+# transaction. The drop-in is written by run_onchange_after_45-wsl-ssh.sh.tmpl,
+# which cannot run while this script fails, so keep service starts out of apt
+# with policy-rc.d: invoke-rc.d and deb-systemd-invoke both honor exit code 101
+# ("do not start"). The SSH script starts the socket on 2222 afterwards.
+if [ "$is_wsl" -eq 1 ]; then
+    policy_rc_tmp=$(mktemp)
+    printf '#!/bin/sh\n# Installed temporarily by chezmoi while apt runs.\nexit 101\n' >"$policy_rc_tmp"
+    chmod 0755 "$policy_rc_tmp"
+    if [ -e /usr/sbin/policy-rc.d ] && ! cmp -s "$policy_rc_tmp" /usr/sbin/policy-rc.d; then
+        echo "warning: /usr/sbin/policy-rc.d exists; not overriding it" >&2
+    elif [ -e /usr/sbin/policy-rc.d ]; then
+        # Left behind when an earlier run was interrupted; remove it at the end.
+        policy_rc_d=1
+    elif [ ! -e /etc/systemd/system/ssh.socket.d/zz-chezmoi-port.conf ] ||
+        ! openssh_configured; then
+        as_root install -m 0755 "$policy_rc_tmp" /usr/sbin/policy-rc.d
+        policy_rc_d=1
+    fi
+    rm -f "$policy_rc_tmp"
+fi
+
+# An earlier run can leave packages half-configured (an apt transaction aborts
+# as soon as openssh-server's postinst fails), and apt then refuses to install
+# anything else. Repair them before installing; the policy-rc.d above keeps the
+# retried postinst from binding port 22 again.
+if [ -n "$(as_root dpkg --audit 2>/dev/null)" ]; then
+    echo "==> repairing packages left half-configured by an earlier run"
+    as_root env DEBIAN_FRONTEND=noninteractive PATH="$PATH" dpkg --configure -a ||
+        echo "warning: dpkg --configure -a failed" >&2
 fi
 
 echo "==> apt-get update"
@@ -139,6 +186,22 @@ if [ -n "$available" ]; then
                 echo "warning: $pkg installation failed" >&2
         done
     fi
+fi
+
+# Service starts were only held back for the apt transaction above; the SSH
+# script restarts ssh.socket once it has installed the 2222 drop-ins.
+if [ "$policy_rc_d" -eq 1 ]; then
+    as_root rm -f /usr/sbin/policy-rc.d
+    policy_rc_d=0
+fi
+
+# `dpkg -s` reports a half-configured package as installed, so a repair that
+# still failed would otherwise let this hash-gated script finish successfully
+# and leave every later apt transaction broken.
+if [ -n "$(as_root dpkg --audit 2>/dev/null)" ]; then
+    echo "error: packages are still half-configured; apt will keep failing" >&2
+    echo "       fix the postinst error above and run chezmoi apply again" >&2
+    exit 1
 fi
 
 # Ubuntu renames the upstream fd and bat binaries to fdfind and batcat. Link

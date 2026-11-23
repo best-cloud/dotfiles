@@ -99,12 +99,19 @@ behavior; this file only records what agents otherwise get wrong.
   `openssh-server` is the other Linux-only package: it provides the WSL2 sshd,
   which `run_onchange_after_45-wsl-ssh.sh.tmpl` configures on port 2222. The
   script exits on non-WSL kernels, so Ubuntu Server keeps port 22; macOS and
-  Windows provide their own SSH servers and need no package entry. The first WSL
-  apply has no systemd, so the package script prepends a temporary no-op
-  `systemctl` to `PATH` (and passes it through sudo) while apt runs; without it
-  `openssh-server`'s postinst fails and leaves dpkg broken for every later apt
-  transaction. Keep that shim; the SSH socket takes effect after
-  `wsl --shutdown`. `zstd` is Linux-only too: the upstream Ollama installer
+  Windows provide their own SSH servers and need no package entry. Mirrored WSL
+  networking shares the Windows host's ports, so port 22 belongs to the Windows
+  OpenSSH server and openssh-server's postinst cannot start `ssh.socket` there.
+  The package script therefore runs apt with a temporary `/usr/sbin/policy-rc.d`
+  that exits 101 (`invoke-rc.d` and `deb-systemd-invoke` both honor it) and
+  repairs a half-configured package from an earlier run with
+  `dpkg --configure -a`; without that, the failed postinst breaks every later
+  apt transaction and the `after_` script never gets to write the 2222 drop-in.
+  While WSL has no systemd (the first apply, before `wsl --shutdown`), the
+  package script also prepends a temporary no-op `systemctl` to `PATH` (and
+  passes it through sudo) while apt runs. Keep both guards; the SSH socket takes
+  effect after `wsl --shutdown`.
+  `zstd` is Linux-only too: the upstream Ollama installer
   needs it for extraction. `wslu`/`wslview` is not packaged by Ubuntu 26.04; do
   not add it to `PACKAGES`, and keep fish's `BROWSER=wslview` guard for manual
   installs.
@@ -330,9 +337,11 @@ behavior; this file only records what agents otherwise get wrong.
   section of `/etc/wsl.conf` (detected via `/proc/version`) and never overwrites
   the rest of the file. WSL only reads it at distro start, so the restart with
   `wsl --shutdown` is required; the bootstrap itself still runs without systemd.
-  Its apt phase uses a temporary no-op `systemctl` so package postinst scripts
-  can finish, and the SSH socket starts with the restarted systemd. Ollama's
-  installer writes the unit but cannot enable it until that restart.
+  The first `chezmoi apply` may still run without systemd, so the package script
+  provides a no-op `systemctl` for package postinst scripts and keeps service
+  starts out of apt with `policy-rc.d`; the SSH socket starts with the restarted
+  systemd. Ollama's installer writes the unit but cannot enable it until that
+  restart.
 - WSL appends the Windows `PATH`, which includes `/mnt/c/...`. Never use a bare
   `command -v` to decide whether a Linux tool is installed: when the native
   binary is missing, the probe falls through to a Windows shim (the Windows npm
