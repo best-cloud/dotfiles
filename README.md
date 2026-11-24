@@ -807,7 +807,7 @@ machine.
 
 ### Remote hosts and `xterm-ghostty` terminfo
 
-Ghostty sets `TERM=xterm-ghostty`, so the remote host needs that entry in its
+Ghostty sets `TERM=xterm-ghostty`, so every remote host needs that entry in its
 terminfo database. `ssh-terminfo` installs it with `tic` on the remote and
 `ssh-env` rewrites `TERM` to `xterm-256color` when that fails; both live in the
 shell integration, so they only apply to `ssh` started from a shell that loaded
@@ -815,6 +815,9 @@ it. When neither takes effect, tmux reports
 `missing or unsuitable terminal: xterm-ghostty`, and curses programs and
 readline lose Delete and the arrow keys because they fall back to
 dumb-terminal behaviour.
+
+The steps below cover any host where the automatic install cannot work; the
+Synology NAS is the current example.
 
 **SOP: `missing or unsuitable terminal: xterm-ghostty`**
 
@@ -829,32 +832,32 @@ dumb-terminal behaviour.
 3. **Check how the remote resolves terminfo.**
 
    ```sh
-   ssh <nas-host> 'echo TERM=$TERM; echo TERMINFO=${TERMINFO-unset}; command -v tic'
+   ssh <remote-host> 'echo TERM=$TERM; echo TERMINFO=${TERMINFO-unset}; command -v tic'
    ```
 
    A set `TERMINFO` wins over `~/.terminfo` and `TERMINFO_DIRS` for both ncurses
-   and tmux, so install into that directory (DSM: `/usr/share/terminfo`). If it
-   is unset and `tic` exists, the automatic install in step 2 only needs a
+   and tmux, so install into that directory (normally `/usr/share/terminfo`).
+   If it is unset and `tic` exists, the automatic install in step 2 only needs a
    usable `PATH`; otherwise install by hand as in step 4.
-4. **Install the compiled entry system-wide.** No `tic` is needed; `scp` to the
-   NAS fails unless its SFTP service is enabled, so stream the file through
-   `ssh`:
+4. **Install the compiled entry system-wide.** No `tic` is needed. Stream the
+   file rather than using `scp`, which fails on hosts without an SFTP service
+   (Synology DSM). Substitute the directory from step 3 if it is not
+   `/usr/share/terminfo`:
 
    ```sh
-   ssh <nas-host> 'cat > /tmp/xterm-ghostty' \
+   ssh <remote-host> 'cat > /tmp/xterm-ghostty' \
      < /Applications/Ghostty.app/Contents/Resources/terminfo/78/xterm-ghostty
-   ssh -t <nas-host> 'sudo install -D -m 644 -o root -g root \
+   ssh -t <remote-host> 'sudo install -D -m 644 -o root -g root \
      /tmp/xterm-ghostty /usr/share/terminfo/x/xterm-ghostty'
    ```
 
 5. **Verify from a login shell with no overrides.** `clear` and `toe` exercise
-   DSM's and the package's ncurses; tmux reports `screen` inside because that is
-   what that build defaults to (DSM has `screen` but not `tmux-256color`):
+   the remote's ncurses, and tmux starts in it:
 
    ```sh
    env -u TERMINFO -u TERMINFO_DIRS TERM=xterm-ghostty bash -l -c '
      clear && echo clear ok
-     /var/packages/synocli-net/target/bin/toe -a | grep -i ghostty
+     toe -a | grep -i ghostty   # DSM: /var/packages/synocli-net/target/bin/toe
      tmux new -d -s t && tmux kill-server && echo tmux ok'
    ```
 
@@ -864,11 +867,15 @@ dumb-terminal behaviour.
    when not 22) that Ghostty prints, not the ssh alias:
 
    ```sh
-   ghostty +ssh-cache --add=<nas-user>@<nas-lan-ip>
+   ghostty +ssh-cache --add=<remote-user>@<remote-ip>
    ghostty +ssh-cache              # list entries and their age
    ```
 
-**Background: why the NAS needs steps 4-6**
+`<remote-host>`, `<remote-user>` and `<remote-ip>` stand in for the ssh alias,
+the account and the address; the real values stay out of this repository and
+belong in `~/.ssh/config.d/`, which chezmoi does not manage.
+
+**Example: the Synology NAS**
 
 DSM ships no `tic` or `infocmp`; the `synocli-net` copies are under
 `/var/packages/synocli-net/target/bin`, which is not in the `PATH` an ssh
@@ -879,21 +886,19 @@ command sees. Even a working `tic` would not help: Ghostty installs into
 ncurses 6.6 with a compiled default of
 `/var/packages/synocli-net/target/share/terminfo`, but it still finds
 `/usr/share/terminfo`, so one copy covers both. `/lib/terminfo` and
-`/usr/lib/terminfo` are symlinks to `/usr/share/terminfo`.
-
-`<nas-host>`, `<nas-user>` and `<nas-lan-ip>` stand in for the ssh alias, the
-account and the LAN address; the real values stay out of this repository and
-belong in `~/.ssh/config.d/`, which chezmoi does not manage. `<nas-user>` is in
-the DSM `administrators` group, so `sudo` works with its own password.
+`/usr/lib/terminfo` are symlinks to `/usr/share/terminfo`, and its tmux reports
+`screen` inside because DSM has no `tmux-256color`. The NAS account is in the
+DSM `administrators` group, so `sudo` works with its own password.
 
 **Maintenance**
 
-- A DSM upgrade resets `/usr`: re-run step 4.
+- An update that resets `/usr` (a DSM upgrade does) removes the entry: re-run
+  step 4.
 - A Ghostty upgrade can change the bundled entry: re-copy it with step 4. The
   cache entry stays valid, because the host still has a terminfo entry.
 - Do not leave a `~/.terminfo` copy or a `TERMINFO_DIRS` line behind as a
-  "backup": DSM's `TERMINFO` makes both invisible to every program, which is
-  what made the original diagnosis confusing.
+  "backup": a host that sets `TERMINFO` makes both invisible to every program,
+  which is what made the original diagnosis confusing.
 
 ### macOS: NAS and USB metadata
 

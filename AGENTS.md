@@ -206,9 +206,9 @@ behavior; this file only records what agents otherwise get wrong.
   first, keepalives, `AddKeysToAgent`, and ControlMaster/ControlPath/
   ControlPersist on Unix only (Windows OpenSSH does not multiplex). Put
   machine-specific hosts in `~/.ssh/config.d`, never in the managed file. Never
-  commit real LAN addresses, host aliases or user accounts either: README and
-  AGENTS.md use the placeholders `<nas-host>`, `<nas-lan-ip>` and `<nas-user>`
-  for the Synology NAS.
+  commit real addresses, host aliases or user accounts either: README and
+  AGENTS.md use the `<remote-host>`, `<remote-ip>` and `<remote-user>`
+  placeholders for remote hosts, with the Synology NAS as the example.
 - `dot_gitconfig.tmpl` owns `core.pager`, `interactive.diffFilter`, the LFS
   filters, `core.autocrlf` (false on Unix, input on Windows), `longpaths` on
   Windows, and the global aliases. `dot_config/git/attributes` is the
@@ -229,14 +229,14 @@ behavior; this file only records what agents otherwise get wrong.
   off by default: they install the `xterm-ghostty` terminfo entry into the
   remote's `~/.terminfo` (and fall back to `xterm-256color`), without which tmux
   and ncurses on a remote host report
-  `missing or unsuitable terminal: xterm-ghostty`. Hosts without `tic` (the
-  Synology DSM NAS) need that entry installed by hand into
-  `/usr/share/terminfo`, because DSM's `/etc/profile` exports
-  `TERMINFO=/usr/share/terminfo` and `TERMINFO` overrides `~/.terminfo` and
-  `TERMINFO_DIRS`; `README.md` ("Remote hosts and `xterm-ghostty` terminfo") has
-  the SOP, the upload, `sudo install`, verification and
-  `ghostty +ssh-cache --add` commands. Do not add a per-user fallback instead:
-  DSM's `TERMINFO` makes it a no-op.
+  `missing or unsuitable terminal: xterm-ghostty`. A host without a usable
+  `tic`, or one that sets `TERMINFO` (the Synology DSM NAS), needs that entry
+  installed by hand where `TERMINFO` points (`/usr/share/terminfo` on DSM),
+  because `TERMINFO` overrides `~/.terminfo` and `TERMINFO_DIRS`; `README.md`
+  ("Remote hosts and `xterm-ghostty` terminfo") has the SOP, the upload,
+  `sudo install`, verification and `ghostty +ssh-cache --add` commands. Do not
+  add a per-user fallback instead: a host that sets `TERMINFO` makes it a
+  no-op.
 - Keep `emacs` in the apt and Homebrew lists and `GNU.Emacs` in the winget
   list. `run_onchange_after_30-spacemacs.*` clones the Spacemacs `develop`
   branch only when `~/.emacs.d` is absent; never switch or overwrite an
