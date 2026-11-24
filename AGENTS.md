@@ -320,7 +320,9 @@ behavior; this file only records what agents otherwise get wrong.
   `defaultProfile` (GUID `{574e775e-4f2a-5b96-ac1e-a2962a402336}`); the Ubuntu
   profile runs `wsl.exe -d Ubuntu --cd ~`. Keep the font at
   `cellHeight: "1.5"`; it is intentionally taller than WezTerm's 1.1 and was
-  manually tuned. Copy-on-select, no copy formatting and trimmed paste are also
+  manually tuned. Keep `useAcrylic: false` and `opacity: 100`: the blurred
+  background looked bad, and WezTerm and the other terminals stay opaque for
+  the same reason. Copy-on-select, no copy formatting and trimmed paste are also
   intentional. Do not set `tabWidthMode`: the default equal-width tabs keep the
   close button in a predictable place, which is why compact tabs were removed.
 - WezTerm remains installed as the WSL-only alternative and defaults to the

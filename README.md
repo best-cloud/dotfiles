@@ -757,9 +757,9 @@ is applied to the packaged Windows Terminal settings file. It:
   generated WSL/Azure/Visual Studio profile sources so the profile list stays
   deterministic;
 - matches the managed WezTerm font and palette: Catppuccin Mocha, JetBrainsMono
-  Nerd Font medium at 12 pt, a deliberately taller 1.5 cell height, 92% acrylic
-  opacity, a hidden tab row when only one tab is open, 100k-line scrollback and
-  a 160x44 initial window;
+  Nerd Font medium at 12 pt, a deliberately taller 1.5 cell height, no Acrylic
+  and 100% opacity (the blur looked bad), a hidden tab row when only one tab is
+  open, 100k-line scrollback and a 160x44 initial window;
 - embeds the `Catppuccin Mocha` color scheme and terminal theme copied verbatim
   from <https://github.com/catppuccin/windows-terminal> (`mocha.json` and
   `mochaTheme.json`).
