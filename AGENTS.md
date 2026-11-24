@@ -220,8 +220,7 @@ behavior; this file only records what agents otherwise get wrong.
 - Terminals are client-side and OS-specific. `dot_config/wezterm/wezterm.lua`
   is Windows-only and WSL-only (no PowerShell/cmd launch menu);
   `dot_config/ghostty/config.ghostty` is macOS-only. Both are gated in
-  `.chezmoiignore`. `dot_config/ghostty/remove_config` deletes the legacy
-  `~/.config/ghostty/config` target, because Ghostty loads it after
+  `.chezmoiignore`. Do not add a legacy `config` target: Ghostty loads it after
   `config.ghostty` and it would override the managed file.
 - Keep `emacs` in the apt and Homebrew lists and `GNU.Emacs` in the winget
   list. `run_onchange_after_30-spacemacs.*` clones the Spacemacs `develop`

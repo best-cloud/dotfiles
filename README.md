@@ -787,9 +787,8 @@ old unmanaged `~/.wezterm.lua` is ignored and can be deleted.
 
 Homebrew installs the `ghostty` cask, and `dot_config/ghostty/config.ghostty` is
 applied to `~/.config/ghostty/config.ghostty`. Ghostty 1.2.3+ prefers that name;
-`dot_config/ghostty/remove_config` deletes any leftover legacy
-`~/.config/ghostty/config`, which Ghostty loads afterwards and would otherwise
-override it. It uses the same JetBrainsMono Nerd Font Medium and Catppuccin
+`config` is only the pre-1.2.3 fallback, and Ghostty loads it afterwards. It
+uses the same JetBrainsMono Nerd Font Medium and Catppuccin
 Mocha as WezTerm, with slightly taller cells and matching text padding, but
 14 pt (larger than WezTerm's 12 pt, which is sized for the 2K
 Windows screen) and 92% opacity with a blurred background where WezTerm stays
