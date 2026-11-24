@@ -829,7 +829,7 @@ dumb-terminal behaviour.
 3. **Check how the remote resolves terminfo.**
 
    ```sh
-   ssh nas 'echo TERM=$TERM; echo TERMINFO=${TERMINFO-unset}; command -v tic'
+   ssh <nas-host> 'echo TERM=$TERM; echo TERMINFO=${TERMINFO-unset}; command -v tic'
    ```
 
    A set `TERMINFO` wins over `~/.terminfo` and `TERMINFO_DIRS` for both ncurses
@@ -841,9 +841,9 @@ dumb-terminal behaviour.
    `ssh`:
 
    ```sh
-   ssh nas 'cat > /tmp/xterm-ghostty' \
+   ssh <nas-host> 'cat > /tmp/xterm-ghostty' \
      < /Applications/Ghostty.app/Contents/Resources/terminfo/78/xterm-ghostty
-   ssh -t nas 'sudo install -D -m 644 -o root -g root \
+   ssh -t <nas-host> 'sudo install -D -m 644 -o root -g root \
      /tmp/xterm-ghostty /usr/share/terminfo/x/xterm-ghostty'
    ```
 
@@ -881,10 +881,10 @@ ncurses 6.6 with a compiled default of
 `/usr/share/terminfo`, so one copy covers both. `/lib/terminfo` and
 `/usr/lib/terminfo` are symlinks to `/usr/share/terminfo`.
 
-`<nas-user>` and `<nas-lan-ip>` stand in for the account and LAN address; the
-real values stay out of this repository and belong in `~/.ssh/config.d/`, which
-chezmoi does not manage. `<nas-user>` is in the DSM `administrators` group, so
-`sudo` works with its own password.
+`<nas-host>`, `<nas-user>` and `<nas-lan-ip>` stand in for the ssh alias, the
+account and the LAN address; the real values stay out of this repository and
+belong in `~/.ssh/config.d/`, which chezmoi does not manage. `<nas-user>` is in
+the DSM `administrators` group, so `sudo` works with its own password.
 
 **Maintenance**
 

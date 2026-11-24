@@ -206,8 +206,9 @@ behavior; this file only records what agents otherwise get wrong.
   first, keepalives, `AddKeysToAgent`, and ControlMaster/ControlPath/
   ControlPersist on Unix only (Windows OpenSSH does not multiplex). Put
   machine-specific hosts in `~/.ssh/config.d`, never in the managed file. Never
-  commit real LAN addresses or user accounts either: README and AGENTS.md use
-  the placeholders `<nas-lan-ip>` and `<nas-user>` for the Synology NAS.
+  commit real LAN addresses, host aliases or user accounts either: README and
+  AGENTS.md use the placeholders `<nas-host>`, `<nas-lan-ip>` and `<nas-user>`
+  for the Synology NAS.
 - `dot_gitconfig.tmpl` owns `core.pager`, `interactive.diffFilter`, the LFS
   filters, `core.autocrlf` (false on Unix, input on Windows), `longpaths` on
   Windows, and the global aliases. `dot_config/git/attributes` is the
