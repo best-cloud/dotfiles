@@ -35,7 +35,13 @@ scrollback-limit = 100000000
 
 # fish is the login shell managed by chezmoi.
 shell-integration = fish
-shell-integration-features = no-cursor
+# no-cursor keeps a block cursor at the prompt. ssh-terminfo installs Ghostty's
+# terminfo entry into ~/.terminfo on the remote host with `tic`, so TERM stays
+# xterm-ghostty there; ssh-env is the fallback that rewrites TERM to
+# xterm-256color when that install fails. Both are off by default, and without
+# them tmux and ncurses on a remote host report
+# "missing or unsuitable terminal: xterm-ghostty".
+shell-integration-features = no-cursor,ssh-terminfo,ssh-env
 
 # macOS: only the left Option key acts as Alt, so the right one keeps typing
 # symbols. Alt+Left/Right are unbound so the shell receives them for

@@ -794,10 +794,106 @@ Mocha as WezTerm, with slightly taller cells and matching text padding, but
 Windows screen) and 92% opacity with a blurred background where WezTerm stays
 opaque. Window chrome, initial window size and macOS window behavior are left
 to Ghostty instead of imitating WezTerm's Windows-oriented decoration. It also
-uses fish shell integration. Only the left Option key acts as Alt, and
-Alt+Left/Right are unbound so the shell gets them for word-wise movement.
-Reload from inside Ghostty with Cmd+Shift+Comma; `ghostty +list-themes` and
-`ghostty +list-fonts` show the names available on the machine.
+uses fish shell integration with `ssh-terminfo` and `ssh-env`: Ghostty installs
+its `xterm-ghostty` terminfo entry into `~/.terminfo` on the remote host with
+`tic` and falls back to `xterm-256color` when that fails. Both features are off
+by Ghostty's default, and without them tmux and ncurses on a remote host report
+`missing or unsuitable terminal: xterm-ghostty`. The Synology NAS cannot
+install it automatically; see the next section. Only the left Option key acts as
+Alt, and Alt+Left/Right are unbound so the shell gets them for word-wise
+movement. Reload from inside Ghostty with Cmd+Shift+Comma;
+`ghostty +list-themes` and `ghostty +list-fonts` show the names available on the
+machine.
+
+### Remote hosts and `xterm-ghostty` terminfo
+
+Ghostty sets `TERM=xterm-ghostty`, so the remote host needs that entry in its
+terminfo database. `ssh-terminfo` installs it with `tic` on the remote and
+`ssh-env` rewrites `TERM` to `xterm-256color` when that fails; both live in the
+shell integration, so they only apply to `ssh` started from a shell that loaded
+it. When neither takes effect, tmux reports
+`missing or unsuitable terminal: xterm-ghostty`, and curses programs and
+readline lose Delete and the arrow keys because they fall back to
+dumb-terminal behaviour.
+
+**SOP: `missing or unsuitable terminal: xterm-ghostty`**
+
+1. **Check the wrapper is active.** In the Ghostty tab that runs `ssh`,
+   `type ssh` must print `ssh is a function`. A path means the shell predates
+   the managed `shell-integration-features`: run `chezmoi apply` and open a new
+   tab.
+2. **Reconnect and read the first line.** `Setting up xterm-ghostty terminfo on
+   <user>@<host>...` with no warning means Ghostty installed it; skip to step 5.
+   `Warning: failed to install terminfo: InstallFailed` means the remote has no
+   usable `tic` in the ssh `PATH`; continue.
+3. **Check how the remote resolves terminfo.**
+
+   ```sh
+   ssh nas 'echo TERM=$TERM; echo TERMINFO=${TERMINFO-unset}; command -v tic'
+   ```
+
+   A set `TERMINFO` wins over `~/.terminfo` and `TERMINFO_DIRS` for both ncurses
+   and tmux, so install into that directory (DSM: `/usr/share/terminfo`). If it
+   is unset and `tic` exists, the automatic install in step 2 only needs a
+   usable `PATH`; otherwise install by hand as in step 4.
+4. **Install the compiled entry system-wide.** No `tic` is needed; `scp` to the
+   NAS fails unless its SFTP service is enabled, so stream the file through
+   `ssh`:
+
+   ```sh
+   ssh nas 'cat > /tmp/xterm-ghostty' \
+     < /Applications/Ghostty.app/Contents/Resources/terminfo/78/xterm-ghostty
+   ssh -t nas 'sudo install -D -m 644 -o root -g root \
+     /tmp/xterm-ghostty /usr/share/terminfo/x/xterm-ghostty'
+   ```
+
+5. **Verify from a login shell with no overrides.** `clear` and `toe` exercise
+   DSM's and the package's ncurses; tmux reports `screen` inside because that is
+   what that build defaults to (DSM has `screen` but not `tmux-256color`):
+
+   ```sh
+   env -u TERMINFO -u TERMINFO_DIRS TERM=xterm-ghostty bash -l -c '
+     clear && echo clear ok
+     /var/packages/synocli-net/target/bin/toe -a | grep -i ghostty
+     tmux new -d -s t && tmux kill-server && echo tmux ok'
+   ```
+
+6. **Cache the host.** Ghostty retries the impossible install on every
+   connection until the host is cached, and each retry forces the
+   `xterm-256color` fallback. The cache key is the `user@host` (plus `:port`
+   when not 22) that Ghostty prints, not the ssh alias:
+
+   ```sh
+   ghostty +ssh-cache --add=<nas-user>@<nas-lan-ip>
+   ghostty +ssh-cache              # list entries and their age
+   ```
+
+**Background: why the NAS needs steps 4-6**
+
+DSM ships no `tic` or `infocmp`; the `synocli-net` copies are under
+`/var/packages/synocli-net/target/bin`, which is not in the `PATH` an ssh
+command sees. Even a working `tic` would not help: Ghostty installs into
+`~/.terminfo`, and DSM's `/etc/profile` exports
+`TERMINFO=/usr/share/terminfo`, which overrides `~/.terminfo` and
+`TERMINFO_DIRS` in ncurses and in tmux. `synocli-net`'s tmux links its own
+ncurses 6.6 with a compiled default of
+`/var/packages/synocli-net/target/share/terminfo`, but it still finds
+`/usr/share/terminfo`, so one copy covers both. `/lib/terminfo` and
+`/usr/lib/terminfo` are symlinks to `/usr/share/terminfo`.
+
+`<nas-user>` and `<nas-lan-ip>` stand in for the account and LAN address; the
+real values stay out of this repository and belong in `~/.ssh/config.d/`, which
+chezmoi does not manage. `<nas-user>` is in the DSM `administrators` group, so
+`sudo` works with its own password.
+
+**Maintenance**
+
+- A DSM upgrade resets `/usr`: re-run step 4.
+- A Ghostty upgrade can change the bundled entry: re-copy it with step 4. The
+  cache entry stays valid, because the host still has a terminfo entry.
+- Do not leave a `~/.terminfo` copy or a `TERMINFO_DIRS` line behind as a
+  "backup": DSM's `TERMINFO` makes both invisible to every program, which is
+  what made the original diagnosis confusing.
 
 ### macOS: NAS and USB metadata
 
@@ -1084,6 +1180,10 @@ chezmoi verify
 - **`ssh` complains about a `ControlPath` socket** — stale multiplexing sockets
   are safe to remove: `rm -f ~/.ssh/control-*`. Multiplexing is only enabled on
   Unix; Windows OpenSSH does not support it.
+- **tmux over ssh reports `missing or unsuitable terminal: xterm-ghostty`** (and
+  Delete or the arrow keys stop working) — the remote lacks Ghostty's terminfo
+  entry, which `ssh-terminfo` cannot install without `tic`. Follow the SOP in
+  "Remote hosts and `xterm-ghostty` terminfo" above.
 - **`bat` says the Catppuccin theme is unknown** — bat 0.26+ bundles it and the
   Homebrew and winget builds are new enough. Ubuntu 26.04 still packages 0.25.0,
   so the theme is managed in `~/.config/bat/themes/` there and compiled by
