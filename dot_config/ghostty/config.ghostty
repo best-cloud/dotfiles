@@ -1,7 +1,7 @@
-# Managed by chezmoi: dot_config/ghostty/config
+# Managed by chezmoi: dot_config/ghostty/config.ghostty
 #
-# Primary terminal on macOS. Ghostty reads ~/.config/ghostty/config there via
-# the XDG search path.
+# Primary terminal on macOS. Ghostty reads ~/.config/ghostty/config.ghostty
+# there via the XDG search path; `config` is only the pre-1.2.3 fallback name.
 # Run `ghostty +list-themes` and `ghostty +list-fonts` to see local names.
 #
 # The text area (font, palette, background and padding) is kept close to the

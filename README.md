@@ -557,7 +557,7 @@ and keeps Markdown trailing spaces.
 │   ├── yt-dlp/config                   # optional yt-dlp/Deno/archive settings
 │   ├── uv/uv.toml                      # TUNA PyPI index for uv (Unix)
 │   ├── wezterm/wezterm.lua             # WezTerm (alternative), WSL2 Ubuntu only
-│   └── ghostty/config                  # macOS terminal
+│   └── ghostty/config.ghostty          # macOS terminal
 ├── AppData/
 │   ├── Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/
 │   │   └── LocalState/settings.json    # Windows Terminal, Catppuccin Mocha
@@ -785,10 +785,13 @@ old unmanaged `~/.wezterm.lua` is ignored and can be deleted.
 
 ### macOS: Ghostty
 
-Homebrew installs the `ghostty` cask, and `dot_config/ghostty/config` is applied
-to `~/.config/ghostty/config`. It uses the same JetBrainsMono Nerd Font Medium
-and Catppuccin Mocha as WezTerm, with slightly taller cells and matching text
-padding, but 14 pt (larger than WezTerm's 12 pt, which is sized for the 2K
+Homebrew installs the `ghostty` cask, and `dot_config/ghostty/config.ghostty` is
+applied to `~/.config/ghostty/config.ghostty`. Ghostty 1.2.3+ prefers that name;
+`dot_config/ghostty/remove_config` deletes any leftover legacy
+`~/.config/ghostty/config`, which Ghostty loads afterwards and would otherwise
+override it. It uses the same JetBrainsMono Nerd Font Medium and Catppuccin
+Mocha as WezTerm, with slightly taller cells and matching text padding, but
+14 pt (larger than WezTerm's 12 pt, which is sized for the 2K
 Windows screen) and 92% opacity with a blurred background where WezTerm stays
 opaque. Window chrome, initial window size and macOS window behavior are left
 to Ghostty instead of imitating WezTerm's Windows-oriented decoration. It also
