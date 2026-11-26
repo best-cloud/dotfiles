@@ -261,9 +261,12 @@ for pkg in $unavailable; do
         if has uv; then
             echo "==> installing ruff (not packaged by this Ubuntu release)"
             # The managed ~/.config/uv/uv.toml is only applied after this
-            # before_ script, so point uv at the TUNA PyPI mirror here too.
-            UV_DEFAULT_INDEX=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
-            export UV_DEFAULT_INDEX
+            # before_ script, so point uv at the TUNA PyPI mirror here too. A
+            # CI runner keeps the canonical index.
+            if [ -z "${CI:-}" ] || [ "${CI:-}" = "false" ]; then
+                UV_DEFAULT_INDEX=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+                export UV_DEFAULT_INDEX
+            fi
             uv tool install ruff ||
                 echo "warning: ruff installation failed" >&2
         else
@@ -301,11 +304,13 @@ for pkg in $unavailable; do
             echo "==> installing Node.js LTS with fnm (not with apt)"
             # fnm downloads from nodejs.org by default; use the TUNA mirror,
             # the same one the apt and ELPA setup targets. TUNA no longer
-            # mirrors npm, so npm packages come from npmmirror.
+            # mirrors npm, so npm packages come from npmmirror outside CI.
             FNM_NODE_DIST_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/
             export FNM_NODE_DIST_MIRROR
-            npm_config_registry=https://registry.npmmirror.com/
-            export npm_config_registry
+            if [ -z "${CI:-}" ] || [ "${CI:-}" = "false" ]; then
+                npm_config_registry=https://registry.npmmirror.com/
+                export npm_config_registry
+            fi
             fnm install --lts ||
                 echo "warning: fnm install --lts failed" >&2
             fnm default lts-latest ||
@@ -502,11 +507,13 @@ if command -v fnm >/dev/null 2>&1; then
     echo "==> installing Node.js LTS with fnm (not with Homebrew)"
     # fnm downloads from nodejs.org by default; use the TUNA mirror, the same
     # one the apt and ELPA setup targets. TUNA no longer mirrors npm, so npm
-    # packages come from npmmirror.
+    # packages come from npmmirror outside CI.
     FNM_NODE_DIST_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/
     export FNM_NODE_DIST_MIRROR
-    npm_config_registry=https://registry.npmmirror.com/
-    export npm_config_registry
+    if [ -z "${CI:-}" ] || [ "${CI:-}" = "false" ]; then
+        npm_config_registry=https://registry.npmmirror.com/
+        export npm_config_registry
+    fi
     fnm install --lts ||
         echo "warning: fnm install --lts failed" >&2
     fnm default lts-latest ||

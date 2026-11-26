@@ -389,29 +389,37 @@ production machine needs immediate security updates.
 
 The package managers that apt does not drive use mirrors too.
 `PACKAGE-MANAGER-MIRRORS.md` records how each ecosystem keeps a mirror out of
-its lockfile, and the pending uv `proxy-index` migration.
+its lockfile, including the uv proxy-index setup now in use.
 
 - **uv / PyPI** — `dot_config/uv/uv.toml` (Unix) and
-  `AppData/Roaming/uv/uv.toml` (Windows, because uv ignores XDG there) set
-  `https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple` as the default index.
-  This covers `uv tool install` (ruff, yt-dlp) and `uv pip`. The Linux branch
-  of the package script also exports `UV_DEFAULT_INDEX` for the `ruff` install,
-  because `run_onchange_before_` scripts run before the config file is applied.
-  Set `UV_DEFAULT_INDEX=https://pypi.org/simple` to bypass the mirror for one
-  command.
+  `AppData/Roaming/uv/uv.toml` (Windows, because uv ignores XDG there) declare
+  the canonical `pypi` index plus a TUNA `[[proxy-index]]`, enabled with
+  `preview-features = ["proxy-index"]`. Local uv resolves and downloads through
+  `https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple` and
+  `/pypi/web/packages`, while `uv.lock` records `pypi.org` and
+  `files.pythonhosted.org`. CI and machines without these user-level files use
+  PyPI directly, so the same lock installs everywhere. This covers `uv tool
+  install` (ruff, yt-dlp) and `uv pip`. Drop `preview-features` once proxy
+  indexes are stable. The Linux branch of the package script still exports
+  `UV_DEFAULT_INDEX` for the `ruff` install, because
+  `run_onchange_before_` scripts run before the config file is applied; CI
+  keeps the canonical index.
 - **Homebrew** — the macOS branch exports `HOMEBREW_API_DOMAIN`
   (`https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api`) and
   `HOMEBREW_BOTTLE_DOMAIN`
   (`https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles`), and the macOS fish
   block sets them for interactive shells. Formula metadata and bottles
   therefore come from TUNA instead of GitHub.
-- **npm** — TUNA no longer mirrors npm, so `prettier` and `aws-cdk` install
-  through npmmirror (Alibaba) with
-  `npm_config_registry=https://registry.npmmirror.com/`. fish and the PowerShell
-  profile export it for interactive use, and the install scripts set it for the
-  first apply. It is an environment variable rather than a managed `~/.npmrc`
-  so npm's own `allow-scripts` allowlist (which `@opencode/cli` needs) survives;
-  override it per command with `--registry=https://registry.npmjs.org/`.
+- **npm** — TUNA no longer mirrors npm, so local `npm install` uses npmmirror
+  (Alibaba) with `npm_config_registry=https://registry.npmmirror.com/`. fish
+  and the PowerShell profile set it only when `CI` is unset or false, and the
+  install scripts use the same guard; CI keeps `registry.npmjs.org`. Both
+  profiles also export `npm_config_omit_lockfile_registry_resolved=true`, so a
+  locally written `package-lock.json` has no `resolved` mirror URLs and CI can
+  install it from the canonical registry. The registry remains an environment
+  variable rather than a managed `~/.npmrc` so npm's own `allow-scripts`
+  allowlist (which `@opencode/cli` needs) survives; override it per command
+  with `--registry=https://registry.npmjs.org/`.
 - **Node.js** — covered in [Node.js, prettier and linters](#nodejs-prettier-and-linters).
 
 ## Git, SSH and shared developer configs
@@ -555,13 +563,13 @@ and keeps Markdown trailing spaces.
 │   ├── zellij/config.kdl.tmpl          # shared; Windows uses ZELLIJ_CONFIG_DIR
 │   ├── nvim/init.lua                   # plugin-free, works offline
 │   ├── yt-dlp/config                   # optional yt-dlp/Deno/archive settings
-│   ├── uv/uv.toml                      # TUNA PyPI index for uv (Unix)
+│   ├── uv/uv.toml                      # TUNA proxy index for uv (Unix)
 │   ├── wezterm/wezterm.lua             # WezTerm (alternative), WSL2 Ubuntu only
 │   └── ghostty/config.ghostty          # macOS terminal
 ├── AppData/
 │   ├── Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/
 │   │   └── LocalState/settings.json    # Windows Terminal, Catppuccin Mocha
-│   └── Roaming/uv/uv.toml              # TUNA PyPI index for uv (Windows)
+│   └── Roaming/uv/uv.toml              # TUNA proxy index for uv (Windows)
 ├── Documents/
 │   ├── PowerShell/
 │   │   ├── Microsoft.PowerShell_profile.ps1.tmpl   # PowerShell 7

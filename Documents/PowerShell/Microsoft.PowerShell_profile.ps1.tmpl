@@ -39,9 +39,15 @@ if (Test-Path $gitLfsBin) {
 # automatically in directories with a .node-version or .nvmrc file. fnm
 # downloads from nodejs.org by default; use the TUNA mirror, the same one the
 # apt and ELPA setup targets, for reliable downloads in China. TUNA no longer
-# mirrors npm, so npm packages (prettier, aws-cdk) come from npmmirror.
+# mirrors npm, so local npm installs use npmmirror; CI keeps the canonical
+# registry. Omitting resolved URLs keeps package-lock.json portable: a lock
+# written here still installs from registry.npmjs.org in CI and on other
+# machines.
 $env:FNM_NODE_DIST_MIRROR = 'https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/'
-$env:npm_config_registry = 'https://registry.npmmirror.com/'
+$env:npm_config_omit_lockfile_registry_resolved = 'true'
+if (-not $env:CI -or $env:CI -eq 'false') {
+    $env:npm_config_registry = 'https://registry.npmmirror.com/'
+}
 if (Get-Command fnm -ErrorAction SilentlyContinue) {
     fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression
 }

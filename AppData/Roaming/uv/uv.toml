@@ -1,8 +1,19 @@
 # Managed by chezmoi. uv on Windows reads %APPDATA%\uv\uv.toml and ignores
 # XDG_CONFIG_HOME, so this is the Windows copy of dot_config/uv/uv.toml. uv
-# resolves packages through the TUNA PyPI mirror, the same mirror the apt and
-# ELPA setup targets. To use pypi.org directly for one command, set
-# UV_DEFAULT_INDEX=https://pypi.org/simple in that shell.
+# resolves and downloads through the TUNA PyPI proxy, but uv.lock records the
+# canonical pypi.org and files.pythonhosted.org URLs. CI and machines without
+# this user-level file therefore use PyPI directly and the same lock installs
+# everywhere. Proxy indexes are a preview feature; drop preview-features once
+# they stabilize.
+preview-features = ["proxy-index"]
+
 [[index]]
-url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"
+name = "pypi"
+url = "https://pypi.org/simple/"
 default = true
+
+[[proxy-index]]
+name = "tuna"
+url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/"
+artifact-base-url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/packages/"
+proxy-for = "pypi"

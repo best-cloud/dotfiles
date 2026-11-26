@@ -273,16 +273,26 @@ behavior; this file only records what agents otherwise get wrong.
 - PyPI and Homebrew use TUNA as well. `dot_config/uv/uv.toml` (Unix) and
   `AppData/Roaming/uv/uv.toml` (Windows; uv reads `%APPDATA%` and ignores
   XDG, so `.config/uv/**` is ignored on Windows) must stay identical apart from
-  their comments, and the Linux `ruff` fallback exports `UV_DEFAULT_INDEX`
-  because `before_` scripts run before those targets are applied. The macOS
-  install branch exports `HOMEBREW_API_DOMAIN` and `HOMEBREW_BOTTLE_DOMAIN`
-  from `homebrew-bottles`, and the macOS fish block sets both for interactive
-  shells. Do not add `HOMEBREW_BREW_GIT_REMOTE`/`HOMEBREW_CORE_GIT_REMOTE`: brew
-  4+ installs from the API, so the two variables above are enough. TUNA no
-  longer mirrors npm, so npm packages go through npmmirror via
-  `npm_config_registry` (fish, the PS7 profile and both install scripts). Keep
-  it an environment variable rather than a managed `~/.npmrc`: managing that
-  file would drop npm's `allow-scripts` allowlist, which `@opencode/cli` needs.
+  their comments. Both declare the canonical `pypi` index plus a TUNA
+  `[[proxy-index]]`, enabled with `preview-features = ["proxy-index"]`, so local
+  uv resolves and downloads through TUNA while `uv.lock` records
+  `pypi.org`/`files.pythonhosted.org`; CI and machines without the user-level
+  file use PyPI directly. Drop the preview key once the feature stabilizes. The
+  Linux `ruff` fallback exports `UV_DEFAULT_INDEX` because `before_` scripts run
+  before those targets are applied, but skips the mirror when `CI` is set. The
+  macOS install branch exports `HOMEBREW_API_DOMAIN` and
+  `HOMEBREW_BOTTLE_DOMAIN` from `homebrew-bottles`, and the macOS fish block
+  sets both for interactive shells. Do not add
+  `HOMEBREW_BREW_GIT_REMOTE`/`HOMEBREW_CORE_GIT_REMOTE`: brew 4+ installs from
+  the API, so the two variables above are enough. TUNA no longer mirrors npm, so
+  npm packages go through npmmirror via `npm_config_registry` (fish, the PS7
+  profile and both install scripts) only outside CI; a CI shell keeps
+  `registry.npmjs.org`. Both profiles also export
+  `npm_config_omit_lockfile_registry_resolved=true`, so a locally written
+  `package-lock.json` omits mirror URLs and CI can install it from the canonical
+  registry. Keep the registry an environment variable rather than a managed
+  `~/.npmrc`: managing that file would drop npm's `allow-scripts` allowlist,
+  which `@opencode/cli` needs.
 - Prefer template data (`.name`, `.email`, `.editor`, `.isWSL`, `.isMacOS`,
   `.isWindows`) over per-OS duplicate files.
 

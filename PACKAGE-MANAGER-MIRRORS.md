@@ -5,12 +5,13 @@ package was downloaded from. When the mirror is baked into the lockfile, anyone
 else (CI in another region, contributors abroad) is forced through that mirror.
 
 This note records, per package manager, how to keep the mirror on the machine
-that needs it while the committed lockfile stays canonical. It is the follow-up
-list for the uv `proxy-index` migration: revisit each section when that feature
-ships. Context is in [uv (the trigger)](#uv-the-trigger).
+that needs it while the committed lockfile stays canonical. The uv
+`proxy-index` migration landed in this repo with uv 0.13.10; the other sections
+record the same local-mirror/canonical-lock split for other package managers.
 
-Status: 2026-11-23. The chezmoi-managed mirrors are TUNA for PyPI and npmmirror
-for npm (see "PyPI, Homebrew and npm mirrors" in `README.md`).
+Status: 2026-11-26. The chezmoi-managed mirrors are TUNA for PyPI and npmmirror
+for npm (see "PyPI, Homebrew and npm mirrors" in `README.md`). Both `uv.toml`
+copies use a TUNA proxy index, and npm omits resolved URLs from new lockfiles.
 
 ## The three designs
 
@@ -18,23 +19,17 @@ for npm (see "PyPI, Homebrew and npm mirrors" in `README.md`).
 | --- | --- | --- | --- |
 | URL-free lock | versions + hashes | install-time config | pnpm, Yarn Berry, pip, Go |
 | Canonical URL, rewritten on fetch | canonical URLs | client config rewrites the host | npm `replace-registry-host`, uv `proxy-index`, Bundler `mirror.*` |
-| Mirror baked into the lock | mirror URLs | lockfile hard-codes the mirror | npm custom registry, Yarn 1, Poetry, uv today |
+| Mirror baked into the lock | mirror URLs | lockfile hard-codes the mirror | npm custom registry, Yarn 1, Poetry |
 
-The second design is what uv is adding. The first is equivalent in practice and
-needs no new feature. The third is the one this note exists to avoid.
+The second design is what uv's `proxy-index` implements. The first is
+equivalent in practice and needs no new feature. The third is the one this note
+exists to avoid.
 
 ## uv (the trigger)
 
-Current state: `dot_config/uv/uv.toml` (Unix) and
-`AppData/Roaming/uv/uv.toml` (Windows) set TUNA as the default index with a plain
-`[[index]]` entry. That bakes `mirrors.tuna.tsinghua.edu.cn` into every
-`uv.lock`, and `uv sync --frozen`/`--locked` downloads from those recorded URLs
-regardless of the index configuration (astral-sh/uv#19625), so CI pays for the
-mirror.
-
-Target state (uv's "proxy index" preview, astral-sh/uv#20790, merged
-2026-11-17): resolve and download through TUNA while the lockfile records
-`pypi.org` and `files.pythonhosted.org`. Both `uv.toml` copies get:
+Migrated 2026-11-26 with uv 0.13.10. Both `dot_config/uv/uv.toml` (Unix) and
+`AppData/Roaming/uv/uv.toml` (Windows) now define the canonical `pypi` index and
+a TUNA proxy:
 
 ```toml
 preview-features = ["proxy-index"]
@@ -62,26 +57,24 @@ Notes:
   `pypi` index, so no extra setting is needed for the upstream side.
 - Keep the proxy in the **user-level** `uv.toml`, never in a project's
   `pyproject.toml`: a proxy configured in the project would be committed.
-- Blocker: the newest release at the time of writing is uv 0.13.9 (published
-  2026-11-17 09:57 UTC), which predates the merge and rejects
-  `[[tool.uv.proxy-index]]` with `unknown field 'proxy-index'`. Wait for the next
-  release, or build from `main`.
+- Local uv resolves and downloads through TUNA; `uv.lock` records
+  `pypi.org`/`files.pythonhosted.org`. CI and other machines do not have the
+  user-level file, so they use the canonical hosts directly. There is no
+  per-command environment override for a configured proxy, so bypassing it
+  means using a different user config file or a scratch `HOME`.
 
-Checklist (do when a supporting uv is released):
+Checklist (completed 2026-11-26 unless noted):
 
-- [ ] Upgrade uv and confirm `[[proxy-index]]` parses.
-- [ ] Replace the TUNA `[[index]]` in both `uv.toml` copies with the block above.
-- [ ] Update `README.md` and `AGENTS.md` (mirror rules live in both).
+- [x] Upgrade uv and confirm `[[proxy-index]]` parses (0.13.10).
+- [x] Replace the TUNA `[[index]]` in both `uv.toml` copies with the block above.
+- [x] Update `README.md` and `AGENTS.md` (mirror rules live in both).
 - [ ] Run `uv lock` in each project; `git diff uv.lock` must show only
-      `mirrors.tuna…` -> `pypi.org`/`files.pythonhosted.org`.
-- [ ] Validate with a frozen install on a clean cache **without** the proxy
-      (CI or a scratch machine).
+      `mirrors.tuna…` -> `pypi.org`/`files.pythonhosted.org`. A scratch project
+      produced canonical URLs; regenerate each real project's lock when
+      convenient.
+- [x] Validate with a frozen install on a clean cache **without** the proxy
+      (scratch project with `--no-config`).
 - [ ] Remove the `preview-features` line once proxy indexes are stable.
-
-Interim option if CI speed matters before the release: generate locks against
-the upstream index (`UV_DEFAULT_INDEX=https://pypi.org/simple uv lock`), scoped to
-the command so it cannot leak into a later lock, and accept that dev installs
-then use `files.pythonhosted.org`.
 
 ## npm
 
@@ -117,6 +110,13 @@ omit-lockfile-registry-resolved=true
 or generate the lock against the upstream registry once:
 `npm install --registry=https://registry.npmjs.org`.
 
+In this repo, fish and the PS7 profile export
+`npm_config_omit_lockfile_registry_resolved=true` and set
+`npm_config_registry=https://registry.npmmirror.com/` only when `CI` is unset or
+false; the install scripts use the same guard. Local installs therefore use
+npmmirror while a newly written lockfile omits mirror URLs, and CI installs the
+same lock from `registry.npmjs.org`.
+
 Do not rely on `replace-registry-host=always`; it only works if every machine
 sets it, and it rewrites the host to whatever registry that machine uses.
 
@@ -148,10 +148,10 @@ registry URLs (direct URL dependencies are the exception), and the index is a
 command-line or `PIP_INDEX_URL` setting. This is URL-free by design, so a TUNA
 mirror locally and PyPI in CI already work.
 
-Escape hatch while uv `proxy-index` is unavailable:
-`uv export --format requirements-txt --generate-hashes > requirements.txt`, then
-install per machine with `--index-url`/`UV_DEFAULT_INDEX`. It loses `uv sync`'s
-environment management but gives a portable, hash-pinned install.
+A requirements export remains an option when a portable, hash-pinned file is
+needed without `uv.lock`: `uv export --format requirements-txt
+--generate-hashes > requirements.txt`, then install per machine with
+`--index-url`/`UV_DEFAULT_INDEX`. It loses `uv sync`'s environment management.
 
 `uv pip compile --format pylock.toml` records the upstream index in
 `packages.index` for proxied files, which is what lets `uv pip install` use a
@@ -204,24 +204,24 @@ Bundler redirects downloads to the mirror without touching the lockfile, so the
 same lock builds everywhere. This is the closest existing analogue of uv's
 `proxy-index`.
 
-## When uv `proxy-index` ships
+## Follow-up list
 
-Consolidated follow-up list:
+Status after uv 0.13.10:
 
-- [ ] uv: migrate both `uv.toml` copies (see the checklist above).
-- [ ] npm: add `omit-lockfile-registry-resolved=true` to projects whose lock must
-      stay portable, or lock against `registry.npmjs.org`.
+- [x] uv: migrate both `uv.toml` copies (see the checklist above).
+- [x] npm: set `omit-lockfile-registry-resolved=true` outside the project and
+      keep the registry in user config or the environment.
 - [ ] Yarn: prefer Berry for new projects; do not write locks through a mirror.
 - [ ] Poetry: keep the mirror out of `pyproject.toml`; lock against PyPI.
 - [ ] Cargo/Go/Bundler: document the per-machine mirror command in the project
       README instead of the lock.
-- [ ] Re-read this note after the uv release and delete the interim advice.
 
 ## References
 
 - uv proxy indexes: <https://github.com/astral-sh/uv/pull/20790>,
-  <https://docs.astral.sh/uv/concepts/indexes/#proxy-indexes> (docs on `main`;
-  the published site lags until the next release)
+  <https://docs.astral.sh/uv/concepts/indexes/#proxy-indexes>
+- uv 0.13.10 changelog (proxy index release):
+  <https://github.com/astral-sh/uv/blob/main/CHANGELOG.md#01310>
 - uv lockfile URL portability: <https://github.com/astral-sh/uv/issues/6349>
 - `uv sync --frozen` hard-coded URLs: <https://github.com/astral-sh/uv/issues/19625>
 - npm config (`registry`, `replace-registry-host`,

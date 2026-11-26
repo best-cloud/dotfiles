@@ -83,9 +83,11 @@ $missing = @()
 # fnm downloads Node.js from nodejs.org by default. Use the TUNA mirror, the
 # same one the apt and ELPA setup targets; fish and the PS7 profile set this
 # too, but a fresh machine has not loaded them when this script runs. TUNA no
-# longer mirrors npm, so npm packages come from npmmirror.
+# longer mirrors npm, so npm packages come from npmmirror outside CI.
 $env:FNM_NODE_DIST_MIRROR = 'https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/'
-$env:npm_config_registry = 'https://registry.npmmirror.com/'
+if (-not $env:CI -or $env:CI -eq 'false') {
+    $env:npm_config_registry = 'https://registry.npmmirror.com/'
+}
 if ($fnmCmd) {
     Write-Host 'installing: Node.js LTS (fnm)'
     & $fnmCmd install --lts
