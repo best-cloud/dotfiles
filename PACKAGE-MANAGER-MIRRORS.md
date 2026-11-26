@@ -36,7 +36,7 @@ preview-features = ["proxy-index"]
 
 [[index]]
 name = "pypi"
-url = "https://pypi.org/simple/"
+url = "https://pypi.org/simple"
 default = true
 
 [[proxy-index]]
