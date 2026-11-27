@@ -10,12 +10,13 @@ Design principles:
   immediately: `fd`/`bat` under their upstream names, a Catppuccin theme
   everywhere, `fzf` history search, SSH connection reuse, Git LFS and delta,
   and one `chezmoi apply` to repair the whole setup.
-- **Catppuccin Mocha on the command line** — every CLI/TUI tool with an
-  official Catppuccin port uses the Mocha flavor with the mauve accent: bat,
-  btop, delta, eza, fish, fzf, lazygit, OpenCode, PowerShell, Starship, tmux and
-  Zellij. The terminals and Windows Terminal already use it. Editors are
-  deliberately outside this list: the Neovim config stays plugin-free and
-  Spacemacs keeps its own theme.
+- **Catppuccin Mocha everywhere** — every CLI/TUI tool with an official
+  Catppuccin port uses the Mocha flavor with the mauve accent: bat, btop,
+  delta, eza, fish, fzf, lazygit, Neovim, OpenCode, PowerShell, Spacemacs,
+  Starship, tmux and Zellij. The terminals and Windows Terminal already use it.
+  Neovim uses the official `catppuccin/nvim` plugin through Neovim 0.12's
+  built-in `vim.pack`, so no third-party plugin manager is involved. Neovim
+  0.11 (Ubuntu 26.04) has no `vim.pack` and keeps the default colors.
 - **Package manager first** — apt on Ubuntu/WSL, Homebrew on macOS, winget on
   Windows. Upstream installers are only a fallback for tools a distro does not
   package.
@@ -492,17 +493,34 @@ share one palette:
 | fish | `dot_config/fish/themes/catppuccin-mocha.theme`, selected with `fish_config theme choose` |
 | fzf | `FZF_DEFAULT_OPTS`, identical in fish and the PowerShell profile |
 | lazygit | `dot_config/lazygit/config.yml` |
+| Neovim | `dot_config/nvim/init.lua` installs the official `catppuccin/nvim` with `vim.pack.add` and selects `flavour = "mocha"` (Neovim 0.12+; 0.11 has no `vim.pack` and keeps default colors) |
 | OpenCode | `dot_config/opencode/cli.json` (built-in `catppuccin` theme; CLI settings, not `opencode.json`) |
 | PowerShell | `Documents/PowerShell/Modules/Catppuccin` (vendored port) supplies the PSReadLine and `$PSStyle` colors |
+| Spacemacs | `dot_spacemacs` (`catppuccin-theme` from MELPA with `catppuccin-flavor` set to `mocha`) |
 | Starship | `dot_config/starship.toml` (`catppuccin_mocha` palette) |
 | tmux | `dot_config/tmux/tmux.conf` plus the cloned `catppuccin/tmux` plugin |
 | Zellij | `dot_config/zellij/config.kdl.tmpl` (built-in theme) |
 
 The bat theme, btop theme, delta gitconfig, eza YAML, fish theme and PowerShell
 module are copied verbatim from the upstream Catppuccin ports. `htop` has no
-Catppuccin port, so it keeps its own colors. Editors are outside this list on
-purpose: `dot_config/nvim/init.lua` stays plugin-free and Spacemacs keeps its
-own theme.
+Catppuccin port, so it keeps its own colors.
+
+The editors use the same palette where the platform allows it. Neovim loads the
+official `catppuccin/nvim` port through Neovim 0.12's built-in plugin manager:
+`init.lua` calls
+`vim.pack.add({ { src = "https://github.com/catppuccin/nvim", name = "catppuccin" } })`,
+which clones the plugin into `stdpath("data")/site/pack/core/opt/catppuccin` on
+the first start and reuses that checkout afterwards. The call passes
+`confirm = false` so startup never blocks on the install prompt, and a failure
+(git or network unavailable) leaves Neovim's default colors instead of breaking
+startup. `vim.pack` also keeps `~/.config/nvim/nvim-pack-lock.json`, which
+records the installed revision; it is machine state and stays unmanaged.
+Neovim 0.11 has no `vim.pack`, and Ubuntu 26.04 still packages 0.11.6, so on
+Linux Neovim deliberately keeps its default colors until the distro ships 0.12;
+macOS (Homebrew) and Windows (winget) run 0.12 and get the theme. Spacemacs uses
+the official `catppuccin-theme` package on every OS, installed from MELPA like
+the other layers, with `catppuccin-flavor` pinned to `mocha` in
+`dotspacemacs/user-init`.
 
 ### Editor and login polish
 
@@ -540,7 +558,7 @@ and keeps Markdown trailing spaces.
 ├── empty_dot_hushlogin                 # empty ~/.hushlogin (suppresses the banner)
 ├── dot_ssh/config.tmpl                 # SSH keepalive, agent, multiplexing
 ├── dot_wslconfig                       # Windows-only mirrored WSL networking
-├── dot_spacemacs                       # default Spacemacs develop dotfile + TUNA ELPA
+├── dot_spacemacs                       # Spacemacs develop dotfile + TUNA ELPA + Catppuccin Mocha
 ├── dot_config/
 │   ├── bat/
 │   │   ├── config                      # shared bat config (BAT_CONFIG_PATH)
@@ -561,7 +579,7 @@ and keeps Markdown trailing spaces.
 │   ├── starship.toml                   # catppuccin-powerline preset + uv python_binary
 │   ├── tmux/tmux.conf                  # catppuccin/tmux plugin
 │   ├── zellij/config.kdl.tmpl          # shared; Windows uses ZELLIJ_CONFIG_DIR
-│   ├── nvim/init.lua                   # plugin-free, works offline
+│   ├── nvim/init.lua                   # core config + catppuccin/nvim via vim.pack
 │   ├── yt-dlp/config                   # optional yt-dlp/Deno/archive settings
 │   ├── uv/uv.toml                      # TUNA proxy index for uv (Unix)
 │   ├── wezterm/wezterm.lua             # WezTerm (alternative), WSL2 Ubuntu only
@@ -1203,11 +1221,14 @@ chezmoi verify
   `run_onchange_after_55-bat-theme.sh.tmpl`; run `bat cache --build` after
   deleting `~/.cache/bat`. If an even older binary is first on `PATH`, upgrade
   it or remove the `--theme` line from `~/.config/bat/config`.
-- **A Catppuccin theme is missing (btop, eza, tmux or OpenCode)** — run
+- **A Catppuccin theme is missing (btop, eza, Neovim, tmux or OpenCode)** — run
   `chezmoi apply`. eza reads `EZA_CONFIG_DIR`, OpenCode reads
   `~/.config/opencode/cli.json` (not `opencode.json`), and tmux needs the
   plugin cloned by `run_onchange_after_56-tmux-catppuccin.sh.tmpl` (git plus
-  network). btop rewrites `btop.conf` when its settings change, so
+  network). Neovim 0.12+ installs `catppuccin/nvim` with `vim.pack` on its first
+  start, so it also needs git plus network; a failed clone shows a warning and
+  leaves the default colors. Neovim 0.11 (Ubuntu 26.04) has no `vim.pack` and
+  keeps the default colors by design. btop rewrites `btop.conf` when its settings change, so
   `chezmoi apply` restores the managed theme and defaults.
 - **`gh`, `lazygit` or `rg` ignores the managed config** — they read
   `GH_CONFIG_DIR`, `LG_CONFIG_FILE` and `RIPGREP_CONFIG_PATH`, which fish and

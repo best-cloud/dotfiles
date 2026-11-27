@@ -194,14 +194,26 @@ behavior; this file only records what agents otherwise get wrong.
   managed files. `EZA_CONFIG_DIR` is what makes the eza theme work on Windows.
   `GH_CONFIG_DIR` also keeps `gh auth login` data out of `%APPDATA%`;
   `hosts.yml` stays unmanaged.
-- Catppuccin Mocha is the only command-line theme. Every installed CLI/TUI tool
-  with an official Catppuccin port uses the Mocha flavor and the mauve accent:
-  bat, btop, delta, eza, fish, fzf, lazygit, OpenCode, PowerShell, Starship,
-  tmux and Zellij (the terminals already use it). Do not add another flavor or
-  a different theme; `htop` has no Catppuccin port and keeps its colors, and the
-  editors are intentionally excluded (Neovim stays plugin-free, Spacemacs keeps
-  its own theme). `FZF_DEFAULT_OPTS` must stay identical in fish and the PS7
-  profile.
+- Catppuccin Mocha is the only theme. Every installed CLI/TUI tool with an
+  official Catppuccin port uses the Mocha flavor and the mauve accent: bat,
+  btop, delta, eza, fish, fzf, lazygit, Neovim, OpenCode, PowerShell, Spacemacs,
+  Starship, tmux and Zellij (the terminals already use it). Do not add another
+  flavor or a different theme; `htop` has no Catppuccin port and keeps its
+  colors. `FZF_DEFAULT_OPTS` must stay identical in fish and the PS7 profile.
+  Neovim uses the official `catppuccin/nvim` plugin through Neovim 0.12's
+  built-in `vim.pack`: `init.lua` calls `vim.pack.add` (with `confirm = false`)
+  and then `require("catppuccin").setup({ flavour = "mocha" })`. Do not add a
+  third-party plugin manager or vendor the plugin; the first start needs git and
+  network access, and a failed install must leave Neovim's default colors rather
+  than break startup. Ubuntu 26.04 packages Neovim 0.11.6, which has no
+  `vim.pack`: Linux deliberately keeps Neovim's default colors, so do not add a
+  fallback colorscheme, a `packadd` clone script or an out-of-band Neovim
+  install for it. Spacemacs uses the
+  official MELPA `catppuccin-theme` package from `dotspacemacs-additional-packages`,
+  selects it in `dotspacemacs-themes` and pins `catppuccin-flavor` to `mocha` in
+  `dotspacemacs/user-init` (the variable must be set before the theme loads).
+  Do not vendor an Emacs theme or switch Spacemacs back to
+  `spacemacs-dark`/`spacemacs-light`.
 - `dot_ssh/config.tmpl` manages `~/.ssh/config`: `Include ~/.ssh/config.d/*.conf`
   first, keepalives, `AddKeysToAgent`, and ControlMaster/ControlPath/
   ControlPersist on Unix only (Windows OpenSSH does not multiplex). Put
@@ -258,7 +270,11 @@ behavior; this file only records what agents otherwise get wrong.
   quelpa's `code-review` build with "wrong-type-argument arrayp nil". The
   default GUI font
   is JetBrainsMono NF 12 pt medium; the mode-line height uses
-  `:separator-scale 1.1`.
+  `:separator-scale 1.1`. The theme is the official MELPA `catppuccin-theme`
+  (added to `dotspacemacs-additional-packages`; Spacemacs also derives that
+  package name from `dotspacemacs-themes '(catppuccin)`), and
+  `catppuccin-flavor` is set to `mocha` at the end of `user-init()` because the
+  theme reads it when it loads. `SPC T n` still cycles `dotspacemacs-themes`.
 - `run_onchange_after_20-macos-defaults.sh.tmpl` is macOS-only and renders
   empty elsewhere. It sets `DSDontWriteNetworkStores` and
   `DSDontWriteUSBStores` in `com.apple.desktopservices` so Finder stops
@@ -454,6 +470,22 @@ behavior; this file only records what agents otherwise get wrong.
 - `dot_config/tmux/tmux.conf` sources the `catppuccin/tmux` plugin, cloned at
   tag v2.3.2 by `run_onchange_after_56-tmux-catppuccin.sh.tmpl` (tmux 3.2+
   reads `~/.config/tmux/tmux.conf`). Keep the tag and the config in sync.
+- `dot_config/nvim/init.lua` is core Neovim plus one plugin: the official
+  `catppuccin/nvim`, installed by Neovim 0.12's built-in `vim.pack`
+  (`vim.pack.add({ { src = "https://github.com/catppuccin/nvim", name = "catppuccin" } }, { confirm = false })`)
+  and selected with `flavour = "mocha"`. The clone lands in
+  `stdpath("data")/site/pack/core/opt/catppuccin`, and `vim.pack` writes
+  `~/.config/nvim/nvim-pack-lock.json`; both are machine state and stay
+  unmanaged. Keep the `pcall`/`vim.notify` fallback so a missing git or network
+  leaves the default colors instead of failing startup, and keep
+  `confirm = false` so the first start does not block on `vim.fn.confirm`. Do
+  not add a third-party plugin manager, and do not vendor `catppuccin/nvim`
+  into the source tree. The whole block sits behind `if vim.pack and
+  vim.pack.add`: Neovim 0.11 (Ubuntu 26.04) has no `vim.pack` and keeps the
+  default colors by design, so do not add a fallback colorscheme for it.
+  `termguicolors` is enabled inside that block (the theme needs true color), so
+  a 0.11 editor keeps Neovim's stock colors instead of a true-color default
+  scheme; do not move it back to the top-level options.
 - OpenCode's theme lives in `dot_config/opencode/cli.json`, not
   `opencode.json`; the built-in `catppuccin` theme is Mocha. `FZF_DEFAULT_OPTS`
   in fish and the PS7 profile must use the same catppuccin/fzf color string.

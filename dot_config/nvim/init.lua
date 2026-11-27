@@ -1,6 +1,11 @@
 -- Minimal Neovim configuration managed by chezmoi.
--- Intentionally plugin-free: works offline on a fresh machine. Add a plugin
--- manager later if you want one.
+-- The only plugin is catppuccin/nvim, installed by Neovim 0.12's built-in
+-- vim.pack on first start; everything else is core Neovim. Neovim 0.11 (what
+-- Ubuntu 26.04 packages) has no vim.pack and keeps the default colors.
+--
+-- Appearance stays at Neovim's stock defaults (no numbers, cursorline,
+-- colorcolumn, listchars or custom statusline); the only visual change is the
+-- Catppuccin Mocha theme loaded below.
 --
 -- The Windows profile sets XDG_CONFIG_HOME, so this same file is used on
 -- Linux, macOS and Windows.
@@ -10,44 +15,55 @@ vim.g.maplocalleader = " "
 
 local opt = vim.opt
 
-opt.number = true
-opt.relativenumber = true
 opt.mouse = "a"
 -- Only use the system clipboard when a provider (wl-copy, xclip, pbcopy, …)
 -- exists. Headless servers have none, and yanks would fail without this guard.
 if vim.fn.has("clipboard") == 1 then
   opt.clipboard = "unnamedplus"
 end
-opt.termguicolors = true
+-- Catppuccin Mocha, the official catppuccin/nvim port, installed through
+-- Neovim's built-in plugin manager (vim.pack). The first start clones the
+-- plugin into stdpath("data")/site/pack/core/opt; later starts reuse that
+-- checkout. `confirm = false` keeps startup from blocking on the install
+-- prompt. If git or the network is unavailable the editor keeps its default
+-- colors instead of failing to start.
+--
+-- vim.pack is Neovim 0.12+. Ubuntu 26.04 still packages Neovim 0.11, which has
+-- no vim.pack, so Linux keeps Neovim's default colors on purpose; macOS and
+-- Windows get the plugin.
+if vim.pack and vim.pack.add then
+  -- The theme needs true color; leave it off elsewhere so 0.11 without vim.pack
+  -- keeps Neovim's stock colors.
+  opt.termguicolors = true
+  local pack_ok, pack_err = pcall(vim.pack.add, {
+    { src = "https://github.com/catppuccin/nvim", name = "catppuccin" },
+  }, { confirm = false })
+  if pack_ok then
+    require("catppuccin").setup({ flavour = "mocha" })
+    vim.cmd.colorscheme("catppuccin")
+  else
+    vim.notify("catppuccin: vim.pack.add failed: " .. tostring(pack_err), vim.log.levels.WARN)
+  end
+end
 opt.expandtab = true
 opt.shiftwidth = 2
 opt.tabstop = 2
 opt.softtabstop = 2
 opt.smartindent = true
-opt.breakindent = true
-opt.wrap = false
 opt.ignorecase = true
 opt.smartcase = true
-opt.signcolumn = "yes"
 opt.updatetime = 250
 opt.splitright = true
 opt.splitbelow = true
 opt.undofile = true
 opt.backup = false
 opt.scrolloff = 8
-opt.colorcolumn = "100"
-opt.cursorline = true
-opt.cursorlineopt = "number"
 opt.confirm = true
 opt.inccommand = "split"
-opt.list = true
-opt.listchars = "tab:» ,trail:·,nbsp:␣,extends:›,precedes:‹"
-opt.fillchars = "eob: "
 opt.completeopt = "menuone,noselect"
 opt.wildmode = "longest:full,full"
 opt.timeoutlen = 400
 opt.ttimeoutlen = 10
-opt.laststatus = 3
 opt.formatoptions:remove("o")
 opt.diffopt:append("linematch:60")
 
@@ -56,23 +72,10 @@ local undodir = vim.fn.stdpath("state") .. "/undo"
 vim.fn.mkdir(undodir, "p")
 opt.undodir = undodir
 
--- netrw: a tree-style browser with no banner. `:Ex` still opens it.
-vim.g.netrw_banner = 0
-vim.g.netrw_liststyle = 3
-vim.g.netrw_winsize = 25
-
 -- Teach Neovim the file types used by this repository.
 vim.filetype.add({
   extension = { kdl = "kdl" },
   filename = { [".envrc"] = "sh" },
-})
-
--- Diagnostics (LSP, if a server is started later): virtual text, sorted by
--- severity, and no virtual lines that shift the code around.
-vim.diagnostic.config({
-  virtual_text = true,
-  severity_sort = true,
-  float = { border = "rounded", source = true },
 })
 
 -- Keep visual-mode indentation after pressing Tab.
