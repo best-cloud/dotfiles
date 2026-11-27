@@ -275,6 +275,18 @@ behavior; this file only records what agents otherwise get wrong.
   package name from `dotspacemacs-themes '(catppuccin)`), and
   `catppuccin-flavor` is set to `mocha` at the end of `user-init()` because the
   theme reads it when it loads. `SPC T n` still cycles `dotspacemacs-themes`.
+  `user-init()` also marks integer-valued variables produced by EditorConfig's
+  directory-local integration as safe when they have no safety predicate of
+  their own and are not marked risky. The managed
+  `~/.editorconfig` is `root = true` with a `[*]` section, so Emacs otherwise
+  prompts "The local variables list in <home> or .dir-locals.el contains
+  values that may not be safe" for js2-mode's `js2-basic-offset` alias and for
+  `powershell-indent-level`. Keep it in `user-init`, not `user-config`:
+  Spacemacs runs `user-config` from `emacs-startup-hook`, after command-line
+  files (`emacs foo.js`) are already visited, so the prompt would still appear
+  there. Never remove this: answering `!` saves `safe-local-variable-values` to
+  the custom file, Spacemacs copies them into the managed `~/.spacemacs`, and
+  the next `chezmoi apply` drops them.
 - `run_onchange_after_20-macos-defaults.sh.tmpl` is macOS-only and renders
   empty elsewhere. It sets `DSDontWriteNetworkStores` and
   `DSDontWriteUSBStores` in `com.apple.desktopservices` so Finder stops

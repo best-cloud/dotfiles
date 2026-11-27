@@ -604,6 +604,44 @@ If you are unsure, try setting them in `dotspacemacs/user-config' first."
   ;; `dotspacemacs/user-config'. Mocha is also the package default, but state it
   ;; explicitly so a future upstream change cannot silently switch flavour.
   (setq catppuccin-flavor 'mocha)
+
+  ;; Emacs 30+ turns `.editorconfig' into directory-local variables. The
+  ;; managed ~/.editorconfig is `root = true' with a `[*]' section, so every
+  ;; file under $HOME gets variables named after the home directory, and Emacs
+  ;; asks "The local variables list in <home> or .dir-locals.el contains values
+  ;; that may not be safe (*)" on the first visit. `indent_size' becomes a
+  ;; mode-specific variable: js2-mode aliases `js2-basic-offset' to the safe
+  ;; `js-indent-level' (safety is checked on the alias symbol) and
+  ;; powershell-mode gets `powershell-indent-level', which is never marked safe.
+  ;; Both are integers from the user's own `.editorconfig', so mark the
+  ;; integer-valued variables EditorConfig produces as safe when they have no
+  ;; safety policy of their own.
+  ;;
+  ;; This belongs in `user-init', not `user-config': Spacemacs runs
+  ;; `user-config' from `emacs-startup-hook', which fires after Emacs has
+  ;; already visited files named on the command line (`emacs foo.js', Finder's
+  ;; "Open With"), so there the prompt would still appear. `user-init' runs
+  ;; while init.el loads, before the layer stack enables `editorconfig-mode'
+  ;; and before command-line files are opened.
+  ;; Answering the prompt with `!' is not durable either: Spacemacs copies the
+  ;; saved `safe-local-variable-values' into the managed ~/.spacemacs, and the
+  ;; next `chezmoi apply' removes them.
+  ;;
+  ;; Keep the whitelist narrow: only variables EditorConfig itself produced,
+  ;; only integer values, never `eval', and never override an existing safety
+  ;; predicate or a variable already marked risky.
+  (with-eval-after-load 'editorconfig
+    (advice-add 'editorconfig--get-local-variables :filter-return
+                (lambda (alist)
+                  (dolist (pair alist)
+                    (let ((var (car pair)))
+                      (when (and (symbolp var)
+                                 (not (eq var 'eval))
+                                 (integerp (cdr pair))
+                                 (not (get var 'safe-local-variable))
+                                 (not (get var 'risky-local-variable)))
+                        (put var 'safe-local-variable #'integerp))))
+                  alist)))
   )
 
 (defun dotspacemacs/user-config ()
