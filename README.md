@@ -124,6 +124,7 @@ GitHub (SSH key or `gh auth login`), or pass an SSH URL through
 | Node.js | fnm (upstream installer) + Node.js LTS | fnm (Homebrew) + Node.js LTS | fnm (winget) + Node.js LTS |
 | AI / Python tooling | opencode, ruff, ollama | opencode, ruff, ollama | OpenCode, Ruff (ollama via WSL) |
 | Formatters / linters | prettier, shfmt, shellcheck | prettier, shfmt, shellcheck | Prettier, shfmt, ShellCheck |
+| Language runtime | lua (`lua5.4`) | lua | Lua (`DEVCOM.Lua`) |
 | Optional daily-use apps | see below (CLI tools) | see below | see below |
 | Terminal | — (client terminal) | Ghostty | Windows Terminal, WezTerm |
 | Remote access | openssh-server (Ubuntu Server 22, WSL 2222), mosh | mosh | Windows OpenSSH Server (22), firewall for 22 + WSL 2222/mosh |
@@ -297,8 +298,10 @@ fish runs `fnm env --use-on-cd`; the PowerShell profile runs the same setup
 with `--shell powershell`. That puts the default Node.js and npm on `PATH` and
 switches versions automatically in directories with a `.node-version` or
 `.nvmrc` file. `fnm install <version>`, `fnm use <version>` and `fnm list` work
-as usual. Spacemacs does not use Node.js: nothing in the managed Emacs config
-calls `node`, so only the shell and the tools you run yourself need it.
+as usual. Spacemacs does not shell out to Node.js for formatting or linting.
+Its only Node.js-backed feature is the JavaScript/TypeScript `tide` backend,
+which runs the `tsserver` bundled with the `tide` package; everything else in
+the managed Emacs config is Emacs Lisp.
 
 Prettier is installed with npm on every platform, including macOS. It is
 deliberately not the Homebrew `prettier` formula, because that formula depends
@@ -1039,10 +1042,20 @@ The enabled layers cover editing and navigation (`auto-completion`,
 `treemacs`, `version-control`) and the common languages `python`, `javascript`,
 `typescript`, `html` (which also handles CSS/SCSS/Less), `yaml`, `json`, `lua`,
 `markdown`, `org`, `shell-scripts`, `toml` and `windows-scripts` (batch files
-and PowerShell). Python is the only language that formats on save:
+and PowerShell). The `tern` and `tide` tool layers are enabled because the
+`javascript` layer defaults to the tern backend and the `typescript` layer
+defaults to tide; without them Emacs reports a missing backend when the first
+JavaScript or TypeScript file is opened. `tide` bundles its own `tsserver`, so
+it needs no separate npm install, and the `tern` layer stays inert unless the
+`tern` binary is on `PATH`. Python is the only language that formats on save:
 
 - `syntax-checking` runs Flycheck, which prefers its built-in `python-ruff`
   checker when `ruff` is on `PATH` (Flycheck 39+).
+- The `lua` layer uses the pure-Emacs `lua-mode` backend, and Flycheck's
+  built-in `lua` checker syntax-checks with `luac -p`. Lua is installed on
+  every platform for that reason (`lua5.4` on apt, `lua` on Homebrew,
+  `DEVCOM.Lua` on winget); Ubuntu ships `lua5.4`/`luac5.4`, so the package
+  script links them to `lua`/`luac` in `~/.local/bin`.
 - The Python layer is configured with `python-formatter 'ruff` and
   `python-format-on-save t`. Spacemacs uses the `ruff-format` package for both
   the on-save hook and `SPC m =` on the current buffer.
@@ -1055,7 +1068,10 @@ and PowerShell). Python is the only language that formats on save:
   AppleDouble `._*` members that break the `code-review` build.
 - `dotspacemacs/user-config` adds `~/.local/bin`, the Homebrew directories on
   macOS and the WinGet/npm directories on Windows to `exec-path`, so GUI Emacs
-  finds `ruff` and `opencode`.
+  finds `ruff` and `opencode`. `dotspacemacs/user-init` adds fnm's default
+  Node.js alias there too, before command-line files are visited, so tide's
+  bundled `tsserver` can run even when Emacs is opened directly on a .js or
+  .ts file.
 
 On Windows the script also sets the user-scope `HOME` variable to
 `%USERPROFILE%` when no `HOME` is defined. Emacs otherwise uses

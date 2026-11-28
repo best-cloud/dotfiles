@@ -44,6 +44,14 @@ This function should only modify configuration layer settings."
      treemacs
      version-control
 
+     ;; Tool layers the language layers default to. `javascript' defaults to
+     ;; the tern backend and `typescript' to tide; without these layers Emacs
+     ;; reports a missing backend the first time a file is opened. The tide
+     ;; layer bundles its own tsserver, so it works without a separate npm
+     ;; install; the tern layer is inert unless the `tern' binary is on PATH.
+     tern
+     tide
+
      ;; Languages. Python is the only language that formats on save: the
      ;; python layer formats with ruff, which is also its Flycheck checker.
      ;; The others are for editing, completion and syntax checking only.
@@ -643,6 +651,18 @@ If you are unsure, try setting them in `dotspacemacs/user-config' first."
                                  (not (get var 'risky-local-variable)))
                         (put var 'safe-local-variable #'integerp))))
                   alist)))
+
+  ;; The JavaScript and TypeScript layers use the tide backend, which runs
+  ;; tsserver through `node'. GUI Emacs may not inherit the shell PATH where
+  ;; fnm put the default Node.js, and command-line files are visited before
+  ;; `user-config' runs, so add fnm's default alias here. Unix keeps the
+  ;; binary in bin/; on Windows node.exe sits at the top of the installation.
+  (dolist (dir (list (expand-file-name "~/.local/share/fnm/aliases/default/bin")
+                     (expand-file-name
+                      "~/Library/Application Support/fnm/aliases/default/bin")
+                     (expand-file-name "~/AppData/Roaming/fnm/aliases/default")))
+    (when (file-directory-p dir)
+      (add-to-list 'exec-path dir)))
   )
 
 (defun dotspacemacs/user-config ()

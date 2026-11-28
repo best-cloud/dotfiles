@@ -126,6 +126,11 @@ behavior; this file only records what agents otherwise get wrong.
   Ubuntu names the `fd` and `bat` binaries `fdfind` and `batcat`; the Linux
   package script links them into `~/.local/bin` as `fd` and `bat` for scripts,
   fzf, Emacs and non-fish shells. Keep the fish wrappers as the fallback.
+  `lua` is in all three lists because Flycheck's built-in `lua` checker runs
+  `luac -p` for the Spacemacs `lua` layer: `lua5.4` on apt, `lua` on Homebrew
+  and `DEVCOM.Lua` on winget. Ubuntu's package exposes `lua5.4`/`luac5.4`, so
+  the same loop links them as `lua`/`luac`; the Linux and macOS branches verify
+  `luac` afterwards.
 - Desktop-only extras are intentional: WeChat DevTools and Postman are
   development tools installed on macOS (`postman`, `wechatwebdevtools` casks)
   and Windows (`Postman.Postman`, `Tencent.WeixinDevTools`), not on Linux. The
@@ -149,8 +154,12 @@ behavior; this file only records what agents otherwise get wrong.
   mirror `https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/` (keep the
   trailing slash; fnm appends `index.json` and the version directories).
   fish sources `fnm env --use-on-cd` and the PS7 profile runs
-  `fnm env --use-on-cd --shell powershell`. Spacemacs does not use Node.js, so
-  nothing in `dot_spacemacs` should grow a `node` dependency.
+  `fnm env --use-on-cd --shell powershell`. Spacemacs does not use Node.js for
+  formatting or linting. Its only Node.js-backed feature is the
+  JavaScript/TypeScript `tide` backend, which runs the `tsserver` bundled with
+  the `tide` package, so `dotspacemacs/user-init` keeps fnm's default alias on
+  `exec-path` (before command-line files are visited); do not grow any other
+  `node` dependency.
 - AWS CLI is in all three package lists (`awscli` on apt/Homebrew,
   `Amazon.AWSCLI` on winget). AWS CDK ships only through npm, so each branch
   installs `aws-cdk` after fnm: `~/.local` on Unix and `%APPDATA%\npm` on

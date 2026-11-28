@@ -65,6 +65,7 @@ mosh
 openssh-server
 neovim
 emacs
+lua5.4
 direnv
 gh
 awscli
@@ -204,11 +205,13 @@ if [ -n "$(as_root dpkg --audit 2>/dev/null)" ]; then
     exit 1
 fi
 
-# Ubuntu renames the upstream fd and bat binaries to fdfind and batcat. Link
-# them into ~/.local/bin (first in PATH) so scripts, fzf, Emacs, Zellij and
-# non-fish shells get the usual names too; the fish wrappers remain as a
-# fallback for machines installed before this link existed.
-for pair in fd:fdfind bat:batcat; do
+# Ubuntu renames or versions some upstream binaries: fd and bat become
+# fdfind/batcat, and Lua's interpreter and compiler are lua5.4/luac5.4. Link
+# the usual names into ~/.local/bin (first in PATH) so scripts, fzf, Emacs,
+# Zellij and non-fish shells get them too; the fish wrappers remain as a
+# fallback for machines installed before this link existed. Flycheck's built-in
+# `lua' checker runs `luac'.
+for pair in fd:fdfind bat:batcat lua:lua5.4 luac:luac5.4; do
     link_name=${pair%%:*}
     link_target=${pair#*:}
     if [ ! -e "$HOME/.local/bin/$link_name" ] && native_cmd "$link_target"; then
@@ -374,6 +377,13 @@ if ! has git-lfs; then
     missing="$missing git-lfs"
 fi
 
+# Flycheck's built-in `lua' checker shells out to luac; without it a Lua buffer
+# reports "No checker to run". The symlink above provides the unversioned name.
+if ! has luac; then
+    echo "warning: luac is missing; Flycheck cannot syntax-check Lua" >&2
+    missing="$missing luac"
+fi
+
 # Ubuntu 26.04 packages Starship 1.22.1, which predates jj_bookmark and prints
 # an "Unknown key" warning on every prompt. Upgrade in place; ~/.local/bin is
 # first in PATH, so the newer binary shadows /usr/bin/starship.
@@ -448,6 +458,7 @@ mosh
 zellij
 neovim
 emacs
+lua
 direnv
 gh
 awscli
@@ -559,6 +570,13 @@ fi
 if ! command -v git-lfs >/dev/null 2>&1; then
     echo "warning: git-lfs is missing; LFS repositories will fail to check out" >&2
     missing="$missing git-lfs"
+fi
+
+# Flycheck's built-in `lua' checker shells out to luac; without it a Lua buffer
+# reports "No checker to run".
+if ! command -v luac >/dev/null 2>&1; then
+    echo "warning: luac is missing; Flycheck cannot syntax-check Lua" >&2
+    missing="$missing luac"
 fi
 
 if [ -n "$missing" ]; then
