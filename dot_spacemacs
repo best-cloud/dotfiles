@@ -50,6 +50,7 @@ This function should only modify configuration layer settings."
      html
      javascript
      json
+     lua
      markdown
      org
      (python :variables python-formatter 'ruff

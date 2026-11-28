@@ -1037,7 +1037,7 @@ values Emacs appends at the end of the file are reverted by the next
 The enabled layers cover editing and navigation (`auto-completion`,
 `better-defaults`, `git`, `helm`, `multiple-cursors`, `syntax-checking`,
 `treemacs`, `version-control`) and the common languages `python`, `javascript`,
-`typescript`, `html` (which also handles CSS/SCSS/Less), `yaml`, `json`,
+`typescript`, `html` (which also handles CSS/SCSS/Less), `yaml`, `json`, `lua`,
 `markdown`, `org`, `shell-scripts`, `toml` and `windows-scripts` (batch files
 and PowerShell). Python is the only language that formats on save:
 
