@@ -1,0 +1,32 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/bin/sh
+# WSL2 only: keep OpenCode's managed service port out of the block that mirrored
+# networking reserves on the Windows host for the guest's ephemeral ports
+# (HcnReserveGuestNetworkServicePortRange, 4095 ports). The block starts at 44620
+# and steps down by 1365 whenever the window holds an in-use port
+# (44620 -> 43255 -> 41890 -> 40525 ...), so anything in 40525-48715 can be
+# swallowed on some boots, and the derived default (49374 here) sat inside a
+# Hyper-V exclusion. 48800 is above every window (the first one ends at 48715)
+# and below the Windows dynamic range (49152), so it is never reserved and never
+# handed out as an ephemeral port.
+#
+# Only a missing port is set; a deliberate value is left alone. The setting lives
+# in ~/.config/opencode/service.json, which carries the service password and
+# stays unmanaged: change it with `opencode service set port`, never by hand.
+set -eu
+
+[ -r /proc/version ] || exit 0
+grep -qi microsoft /proc/version || exit 0
+
+opencode=$HOME/.opencode/bin/opencode
+[ -x "$opencode" ] || exit 0
+
+port=$("$opencode" service get port 2>/dev/null | tr -cd '0-9' || true)
+if [ -n "$port" ]; then
+    exit 0
+fi
+
+echo "==> pinning the OpenCode service port to 48800"
+"$opencode" service set port 48800 ||
+    echo "warning: could not set the OpenCode service port" >&2
+{{ end -}}

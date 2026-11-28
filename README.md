@@ -1239,6 +1239,13 @@ chezmoi verify
   shim when no native binary exists. The install scripts ignore `/mnt` and
   `*.exe` when probing, so re-run `chezmoi apply` to install the native package
   instead of invoking the Windows executable.
+- **OpenCode fails with `Managed service port ... already in use` in WSL** —
+  mirrored networking reserves a 4096-port block on the Windows host for the
+  guest's ephemeral ports, so a fixed port can be unbindable even though
+  `netstat`/`ss` show nothing. A fresh install is pinned to 48800 by
+  `run_onchange_after_60-opencode-port.sh.tmpl`; if an existing install still
+  fails, run `opencode service set port 48800`. If the block ever moves,
+  `cat /proc/sys/net/ipv4/ip_local_port_range` shows its current position.
 - **apt still downloads from archive.ubuntu.com** — the 05 script only runs on
   Ubuntu. Check `/etc/os-release` (`ID=ubuntu`) and run `chezmoi apply`. The
   original source file is preserved as `*.orig`.

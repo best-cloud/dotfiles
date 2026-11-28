@@ -413,6 +413,19 @@ behavior; this file only records what agents otherwise get wrong.
   2222. Keep the runtime `/proc/version` check so Ubuntu Server is untouched,
   and keep the firewall port in sync with these drop-ins. Mosh reuses the SSH
   connection and then uses UDP 60000-61000.
+- OpenCode's managed service port is pinned to 48800 on WSL2 by
+  `run_onchange_after_60-opencode-port.sh.tmpl`. Mirrored networking reserves a
+  4096-port block on the Windows host for the guest's ephemeral ports
+  (`HcnReserveGuestNetworkServicePortRange(4095)`): it starts at 44620 and steps
+  down by 1365 when the window holds an in-use port (44620 -> 43255 -> 41890 ->
+  40525 ...), so anything in 40525-48715 can be swallowed on some boots, and the
+  derived default (49374 here) sat inside a Hyper-V exclusion. 48800 is above
+  every window (the first one ends at 48715) and below the Windows dynamic range
+  (49152), so it is neither reserved nor handed out. The port lives in the
+  unmanaged `~/.config/opencode/service.json`, which carries the service
+  password: change it only with `opencode service set port`, never by editing
+  the file. If it breaks, `cat /proc/sys/net/ipv4/ip_local_port_range` shows the
+  live window; move the constant outside it and update the script and README.
 - On WSL, `bootstrap.sh` idempotently merges `systemd=true` into a `[boot]`
   section of `/etc/wsl.conf` (detected via `/proc/version`) and never overwrites
   the rest of the file. WSL only reads it at distro start, so the restart with
